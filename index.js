@@ -8,6 +8,9 @@ let webhookServer;
 let isShuttingDown = false;
 
 async function main() {
+  // Say hi
+  console.log('Hi!');
+  
   // Validate required environment variables
   const requiredEnvVars = [
     'LINEAR_API_TOKEN',
