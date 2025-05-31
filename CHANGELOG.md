@@ -24,3 +24,11 @@ All notable changes to this project will be documented in this file.
   - Only responds to comments without @ mentions (general conversation)
   - Always responds when directly @ mentioned (someone needs the agent!)
   - Politely ignores when other users are @ mentioned but not the agent (respecting private conversations)
+
+### Fixed
+- Improved attachment handling to properly distinguish images from other file types
+  - Non-image attachments (e.g., .jsonl, .pdf, .csv) are now downloaded separately
+  - Fixed "Could not process image" error when non-image files were treated as images
+  - Attachment download failures are now non-fatal with warnings instead of blocking issue processing
+  - Updated regex to properly parse attachment URLs in markdown format (e.g., `[Link](url)`)
+  - Renamed `.linear-images` directory to `.linear-attachments` to reflect broader file type support
