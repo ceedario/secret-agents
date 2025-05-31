@@ -24,3 +24,7 @@ All notable changes to this project will be documented in this file.
   - Only responds to comments without @ mentions (general conversation)
   - Always responds when directly @ mentioned (someone needs the agent!)
   - Politely ignores when other users are @ mentioned but not the agent (respecting private conversations)
+- Agent now creates threaded comment replies in Linear when appropriate
+  - Tracks parent comment IDs from webhook notifications
+  - Replies to comments are posted as threaded replies maintaining conversation context
+  - New top-level comments are created for unrelated responses

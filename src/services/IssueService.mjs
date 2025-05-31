@@ -23,9 +23,10 @@ export class IssueService {
    * Create a comment on an issue
    * @param {string} issueId - The ID of the issue
    * @param {string} body - The body of the comment
+   * @param {string|null} parentId - The ID of the parent comment for threaded replies
    * @returns {Promise<boolean>} - Success status
    */
-  async createComment(issueId, body) {
+  async createComment(issueId, body, parentId = null) {
     throw new Error('Not implemented');
   }
   
