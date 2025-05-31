@@ -28,9 +28,10 @@ export class ClaudeService {
    * @param {string} response - The response text
    * @param {number|null} costUsd - Optional cost information
    * @param {number|null} durationMs - Optional duration information
+   * @param {string|null} parentId - Optional parent comment ID for threaded replies
    * @returns {Promise<boolean>} - Success status
    */
-  async postResponseToLinear(issueId, response, costUsd = null, durationMs = null) {
+  async postResponseToLinear(issueId, response, costUsd = null, durationMs = null, parentId = null) {
     throw new Error('Not implemented');
   }
   

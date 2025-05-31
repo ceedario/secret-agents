@@ -178,13 +178,16 @@ export class LinearIssueService extends IssueService {
   /**
    * @inheritdoc
    */
-  async createComment(issueId, body) {
+  async createComment(issueId, body, parentId = null) {
     // Calculate body length and create a preview for logging
     const bodyLength = body.length;
     const bodyPreview = bodyLength > 50 ? body.substring(0, 50) + '...' : body;
     
     console.log(`===== CREATING COMMENT ON ISSUE ${issueId} =====`);
     console.log(`Comment length: ${bodyLength} characters, Preview: ${bodyPreview}`);
+    if (parentId) {
+      console.log(`Replying to parent comment: ${parentId}`);
+    }
     
     // Only log full comment body in debug mode
     if (process.env.DEBUG_COMMENT_CONTENT === 'true') {
@@ -193,10 +196,17 @@ export class LinearIssueService extends IssueService {
     
     try {
       console.log('Sending comment to Linear API...');
-      const response = await this.linearClient.createComment({
+      const commentData = {
         issueId,
         body,
-      });
+      };
+      
+      // Add parentId if provided to create a threaded reply
+      if (parentId) {
+        commentData.parentId = parentId;
+      }
+      
+      const response = await this.linearClient.createComment(commentData);
       
       // Only log detailed API response in debug mode
       if (process.env.DEBUG_LINEAR_API === 'true') {
@@ -524,6 +534,10 @@ export class LinearIssueService extends IssueService {
       if (session) {
         // Session exists, send the comment
         try {
+          // Store the comment ID in the session for threading
+          session.lastCommentId = commentData.id;
+          session.conversationContext = 'reply';
+          
           const updatedSession = await this.claudeService.sendComment(session, body);
           this.sessionManager.updateSession(issueId, updatedSession);
           
@@ -605,6 +619,11 @@ export class LinearIssueService extends IssueService {
         // Process the mention as a comment (using commentContent from data.comment.body)
         if (commentContent) {
           console.log(`Processing mention as a comment: ${commentContent.substring(0, 50)}${commentContent.length > 50 ? '...' : ''}`);
+          
+          // Store the comment ID for threading
+          session.lastCommentId = commentId;
+          session.conversationContext = 'mention';
+          
           // Ensure we're using the correct variable (commentContent, not content)
           const updatedSession = await this.claudeService.sendComment(session, commentContent);
           this.sessionManager.updateSession(issueId, updatedSession);
@@ -698,6 +717,11 @@ export class LinearIssueService extends IssueService {
         // Process the reply as a comment
         if (commentContent) {
           console.log(`Processing reply as a comment`);
+          
+          // Store the comment ID for threading - this is a direct reply
+          session.lastCommentId = commentId;
+          session.conversationContext = 'reply';
+          
           const updatedSession = await this.claudeService.sendComment(session, commentContent);
           this.sessionManager.updateSession(issueId, updatedSession);
         }
