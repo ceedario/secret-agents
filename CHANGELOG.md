@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- TypeScript migration test failures
+  - Fixed AttachmentDownloader test mocks to use correct `arrayBuffer()` method instead of `buffer()`
+  - Fixed FileSystem test mocking approach to properly mock namespace imports
+  - Fixed integration test config validation mocking
+  - All tests now pass successfully with the TypeScript migration
+
 ### Added
 - TypeScript support for the entire codebase
   - Migrated all JavaScript files (.mjs) to TypeScript (.ts)
