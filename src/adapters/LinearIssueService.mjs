@@ -63,8 +63,9 @@ export class LinearIssueService extends IssueService {
       priority: linearIssue.priority,
       url: linearIssue.url,
       assigneeId: linearIssue.assignee?.id || linearIssue._assignee?.id || linearIssue.assigneeId,
-      comments: comments,
-      branchName: linearIssue.branchName
+      comments: { nodes: comments },
+      branchName: linearIssue.branchName,
+      blockedByIssues: linearIssue.blockedByIssues || []
     });
   }
   
@@ -155,21 +156,65 @@ export class LinearIssueService extends IssueService {
       const commentsResponse = await this.linearClient.issueComments(issueId);
       const commentCount = commentsResponse?.comments?.nodes?.length || 0;
       
+      // Fetch blocking relations (issues that block this issue)
+      let blockedByIssues = [];
+      try {
+        // Try to fetch inverse relations (issues blocking this one)
+        if (issueResponse.inverseRelations) {
+          const relationsResponse = await issueResponse.inverseRelations({
+            filter: { type: { eq: 'blocks' } }
+          });
+          
+          if (relationsResponse && relationsResponse.nodes) {
+            // For each relation, get the related issue details
+            blockedByIssues = await Promise.all(
+              relationsResponse.nodes.map(async (relation) => {
+                try {
+                  const relatedIssue = await relation.issue;
+                  return {
+                    id: relatedIssue.id,
+                    identifier: relatedIssue.identifier,
+                    title: relatedIssue.title,
+                    state: relatedIssue.state
+                  };
+                } catch (err) {
+                  console.error(`Error fetching blocking issue details:`, err);
+                  return null;
+                }
+              })
+            );
+            
+            // Filter out any null values from failed fetches
+            blockedByIssues = blockedByIssues.filter(issue => issue !== null);
+          }
+        }
+      } catch (relError) {
+        // If relations fetching fails, log but continue
+        if (process.env.DEBUG_LINEAR_API === 'true') {
+          console.error('Error fetching blocking relations:', relError);
+        }
+      }
+      
       // Only log detailed info if debug mode is enabled
       if (process.env.DEBUG_LINEAR_API === 'true') {
         console.log(`===== FETCHING ISSUE: ${issueId} =====`);
         console.log(`Fetched issue: ${issueResponse.identifier} - ${issueResponse.title}`);
         console.log(`Fetched ${commentCount} comments for issue ${issueResponse.identifier}`);
+        if (blockedByIssues.length > 0) {
+          console.log(`Issue is blocked by ${blockedByIssues.length} issue(s):`, 
+            blockedByIssues.map(i => i.identifier).join(', '));
+        }
       }
       
-      // Create a modified issue object with comments
-      const issueWithComments = {
+      // Create a modified issue object with comments and blocking relations
+      const issueWithDetails = {
         ...issueResponse,
-        comments: commentsResponse?.comments?.nodes || []
+        comments: commentsResponse?.comments?.nodes || [],
+        blockedByIssues: blockedByIssues
       };
       
       // Convert to domain issue
-      return this._convertToDomainIssue(issueWithComments);
+      return this._convertToDomainIssue(issueWithDetails);
     } catch (error) {
       console.error(`Error fetching issue ${issueId}:`, error);
       throw error;
@@ -220,6 +265,96 @@ export class LinearIssueService extends IssueService {
   }
   
   /**
+   * Check if permission has been granted to proceed with a blocked issue
+   * @param {Issue} issue - The issue to check
+   * @returns {boolean} - True if permission has been granted
+   */
+  hasBlockedIssuePermission(issue) {
+    if (!issue.comments || !issue.comments.nodes || issue.comments.nodes.length === 0) {
+      return false;
+    }
+
+    // Keywords that indicate permission to proceed
+    const permissionKeywords = [
+      'proceed anyway',
+      'ignore the blocked',
+      'continue anyway',
+      'go ahead',
+      'yes proceed',
+      'you can proceed',
+      'please proceed',
+      'proceed despite',
+      'work on it anyway',
+      'ignore block',
+      'bypass block',
+      'ok to proceed'
+    ];
+
+    // Check comments from oldest to newest (chronological order)
+    const sortedComments = [...issue.comments.nodes].sort((a, b) => 
+      new Date(a.createdAt) - new Date(b.createdAt)
+    );
+
+    // Look for permission after the agent first asked about the blocked status
+    let foundBlockedQuery = false;
+    
+    for (const comment of sortedComments) {
+      const bodyLower = comment.body.toLowerCase();
+      
+      // Check if this is the agent asking about blocked status
+      if (comment.userId === this.userId && bodyLower.includes('blocked')) {
+        foundBlockedQuery = true;
+        continue;
+      }
+      
+      // If we found the agent's query, check for permission in subsequent comments
+      if (foundBlockedQuery && comment.userId !== this.userId) {
+        for (const keyword of permissionKeywords) {
+          if (bodyLower.includes(keyword)) {
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Handle blocked issue logic
+   * @param {Issue} issue - The issue to check
+   * @returns {Promise<boolean>} - True if should proceed, false if blocked
+   */
+  async handleBlockedIssue(issue) {
+    if (!issue.isBlocked()) {
+      return true; // Not blocked, proceed normally
+    }
+
+    // Check if we already have permission from comment history
+    if (this.hasBlockedIssuePermission(issue)) {
+      console.log(`Issue ${issue.identifier} is blocked but permission was previously granted`);
+      return true;
+    }
+
+    // Issue is blocked and no permission found - post a comment asking for permission
+    const blockingIssues = issue.getBlockingIssueIdentifiers();
+    const blockingIssuesText = blockingIssues.length === 1 
+      ? `issue ${blockingIssues[0]}` 
+      : `issues ${blockingIssues.join(', ')}`;
+
+    const message = `⚠️ This issue is currently blocked by ${blockingIssuesText}. 
+
+Are you sure you want me to proceed anyway? Please let me know if I should continue working on this issue despite the blocking status.
+
+Note: If you give permission, I won't ask again for this issue.`;
+
+    await this.createComment(issue.id, message);
+    
+    console.log(`Issue ${issue.identifier} is blocked - waiting for permission`);
+    return false;
+  }
+
+  /**
    * Initialize a session for an issue
    * @param {Issue} issue - The issue to initialize
    * @param {boolean} isStartupInit - Whether this is a system startup initialization
@@ -228,6 +363,13 @@ export class LinearIssueService extends IssueService {
     // Skip if we already have an active session
     if (this.sessionManager.hasSession(issue.id)) {
       console.log(`Already have an active session for issue ${issue.identifier}`);
+      return;
+    }
+    
+    // Check if the issue is blocked and handle accordingly
+    const shouldProceed = await this.handleBlockedIssue(issue);
+    if (!shouldProceed) {
+      // Issue is blocked and no permission granted yet
       return;
     }
     
