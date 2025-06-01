@@ -7,7 +7,7 @@ import {
   NodeClaudeService, 
   ExpressWebhookService 
 } from './adapters/index.js';
-import { SessionManager } from './services/index.js';
+import { SessionManager, ClaudeService, WorkspaceService } from './services/index.js';
 import { FileSystem, ProcessManager, HttpServer, OAuthHelper, AttachmentDownloader } from './utils/index.js';
 
 interface ServiceEntry<T = any> {
@@ -113,15 +113,15 @@ export function createContainer(): Container {
     };
     
     // Create a placeholder client (will be initialized with token later)
-    let client = null;
-    let authType = null;
+    let client: LinearClient | null = null;
+    let authType: 'oauth' | 'apiKey' | null = null;
     let lastInitTime = 0;
     
     // Return a proxy that initializes the client on first use
     return new Proxy({}, {
       get(target, prop, receiver) {
         // Intercept the function call
-        return async function(...args) {
+        return async function(...args: any[]) {
           const now = Date.now();
           
           // Initialize the client if needed or if it's been more than 5 minutes
@@ -131,7 +131,7 @@ export function createContainer(): Container {
             try {
               // Get the auth info (token and type)
               const authInfo = await getAuthToken();
-              authType = authInfo.type;
+              authType = authInfo.type as 'oauth' | 'apiKey';
               
               console.log(`Using ${authInfo.type === 'oauth' ? 'OAuth Access Token' : 'API Key'} (masked): ****${authInfo.token.slice(-4)}`);
               
@@ -159,7 +159,7 @@ export function createContainer(): Container {
                 console.log('Testing Linear API connection...');
                 await client.viewer;
                 console.log('✅ Linear API connection test successful');
-              } catch (testError) {
+              } catch (testError: any) {
                 // Check if this is an authentication error (most common when setting up)
                 if (testError.type === 'AuthenticationError' || 
                     (testError.raw && testError.raw.message && testError.raw.message.includes('Authentication required'))) {
@@ -175,7 +175,7 @@ export function createContainer(): Container {
                   throw new Error('Linear API connection test failed');
                 }
               }
-            } catch (error) {
+            } catch (error: any) {
               // Simplified error message for authentication issues
               if (error.message && error.message.includes('Authentication required')) {
                 console.log('⚠️ Linear authentication needed. Please complete the OAuth flow.');
@@ -192,14 +192,14 @@ export function createContainer(): Container {
           }
           
           // Get the method from the actual client
-          const method = client[prop];
+          const method = (client as any)[prop];
           
           if (typeof method !== 'function') {
             return method;
           }
           
           // Log the API call - condensed format
-          console.log(`Linear API (${authType}): ${prop}${args.length > 0 ? ' with params' : ''}`);
+          console.log(`Linear API (${authType}): ${String(prop)}${args.length > 0 ? ' with params' : ''}`);
           
           // Only log detailed arguments if DEBUG_LINEAR_API is true
           if (process.env.DEBUG_LINEAR_API === 'true' && args.length > 0) {
@@ -211,10 +211,10 @@ export function createContainer(): Container {
             const result = await method.apply(client, args);
             // Minimal success logging
             return result;
-          } catch (error) {
+          } catch (error: any) {
             // Simplified error logging
             const errorMessage = error.message || String(error);
-            console.error(`Linear API error in ${prop}: ${errorMessage.substring(0, 150)}`);
+            console.error(`Linear API error in ${String(prop)}: ${errorMessage.substring(0, 150)}`);
             
             // If the error is an authentication error, reset the client to force re-initialization
             if (error.type === 'AuthenticationError') {
@@ -279,7 +279,6 @@ export function createContainer(): Container {
   
   // Register issue service - circular dependency is resolved at runtime
   container.register('issueService', (c) => {
-    const config = c.get('config');
     const linearClient = c.get('linearClient');
     const sessionManager = c.get('sessionManager');
     
@@ -293,17 +292,19 @@ export function createContainer(): Container {
       null, // userId will be fetched from API instead of config
       sessionManager,
       {
-        startSession: (...args) => claudeService().startSession(...args),
-        sendComment: (...args) => claudeService().sendComment(...args)
-      },
+        startSession: (...args: any[]) => claudeService().startSession(...args),
+        sendComment: (...args: any[]) => claudeService().sendComment(...args),
+        postResponseToLinear: (...args: any[]) => claudeService().postResponseToLinear(...args),
+        buildInitialPrompt: (...args: any[]) => claudeService().buildInitialPrompt(...args)
+      } as ClaudeService,
       {
-        getWorkspaceForIssue: (...args) => workspaceService().getWorkspaceForIssue(...args),
-        createWorkspace: (...args) => workspaceService().createWorkspace(...args)
-      }
+        getWorkspaceForIssue: (...args: any[]) => workspaceService().getWorkspaceForIssue(...args),
+        createWorkspace: (...args: any[]) => workspaceService().createWorkspace(...args)
+      } as WorkspaceService
     );
     
     // Set up a method to fetch user data from the API
-    service.fetchUserData = async () => {
+    (service as any).fetchUserData = async () => {
       try {
         console.log('Fetching agent user data from Linear API...');
         
@@ -361,11 +362,11 @@ export function createContainer(): Container {
           
           console.error('No users found in the organization');
           return false;
-        } catch (usersError) {
+        } catch (usersError: any) {
           console.error('Error fetching users list:', usersError.message);
           return false;
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching user data from Linear API:', error.message);
         return false;
       }
@@ -386,8 +387,20 @@ export function createContainer(): Container {
       config.claude.path,
       config.claude.promptTemplatePath,
       {
-        createComment: (...args) => issueService.createComment(...args)
-      },
+        createComment: (...args: any[]) => issueService.createComment(...args),
+        userId: issueService.userId,
+        username: issueService.username,
+        getAuthStatus: () => issueService.getAuthStatus(),
+        fetchAssignedIssues: () => issueService.fetchAssignedIssues(),
+        initializeIssueSession: (...args: any[]) => issueService.initializeIssueSession(...args),
+        handleAgentAssignment: (...args: any[]) => issueService.handleAgentAssignment(...args),
+        handleAgentMention: (...args: any[]) => issueService.handleAgentMention(...args),
+        handleAgentReply: (...args: any[]) => issueService.handleAgentReply(...args),
+        handleCommentEvent: (...args: any[]) => issueService.handleCommentEvent(...args),
+        handleSessionExit: (...args: any[]) => issueService.handleSessionExit(...args),
+        postResponseToLinear: (...args: any[]) => issueService.postResponseToLinear(...args),
+        postResponseToLinearAsync: (...args: any[]) => issueService.postResponseToLinearAsync(...args)
+      } as any,
       fileSystem,
       processManager,
       attachmentDownloader

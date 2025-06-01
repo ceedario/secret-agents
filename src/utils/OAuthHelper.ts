@@ -18,10 +18,10 @@ interface TokenInfo {
   obtainedAt?: number;
 }
 
-interface StateData {
-  state: string;
-  timestamp: number;
-}
+// interface StateData {
+//   state: string;
+//   timestamp: number;
+// }
 
 /**
  * Helper class for OAuth 2.0 functionality

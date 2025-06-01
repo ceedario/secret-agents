@@ -1,11 +1,11 @@
-import { App } from '../../src/app.mjs';
+import { App } from '../../src/app.js';
 import { jest } from '@jest/globals';
 
 // Mock the dotenv config
 jest.mock('dotenv/config', () => {});
 
 // Mock the env config to avoid validation errors
-jest.mock('../../src/config/env.mjs', () => {
+jest.mock('../../src/config/env.js', () => {
   return {
     default: {
       linear: {
@@ -30,7 +30,7 @@ jest.mock('../../src/config/env.mjs', () => {
 });
 
 // Mock container components
-jest.mock('../../src/container.mjs', () => {
+jest.mock('../../src/container.js', () => {
   const mockWebhookServer = {
     close: jest.fn()
   };

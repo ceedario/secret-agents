@@ -1,5 +1,5 @@
-import { FSWorkspaceService } from '../../../src/adapters/FSWorkspaceService.mjs';
-import { WorkspaceService } from '../../../src/services/WorkspaceService.mjs';
+import { FSWorkspaceService } from '../../../src/adapters/FSWorkspaceService.js';
+import { WorkspaceService } from '../../../src/services/WorkspaceService.js';
 import fs from 'fs-extra';
 import path from 'path';
 import { jest } from '@jest/globals';
@@ -21,8 +21,8 @@ jest.mock('path', () => ({
 }));
 
 // Mock core classes
-jest.mock('../../../src/utils/FileSystem.mjs');
-jest.mock('../../../src/utils/ProcessManager.mjs');
+jest.mock('../../../src/utils/FileSystem.js');
+jest.mock('../../../src/utils/ProcessManager.js');
 jest.mock('../../../src/core/Workspace.js', () => ({
   Workspace: jest.fn().mockImplementation(data => data)
 }));

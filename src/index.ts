@@ -7,17 +7,15 @@ const options: ParseArgsConfig['options'] = {
   'env-file': {
     type: 'string',
     short: 'e',
-    default: '.env.secret-agents',
-    description: 'Path to the environment file'
+    default: '.env.secret-agents'
   },
   help: {
     type: 'boolean',
-    short: 'h',
-    description: 'Show help'
+    short: 'h'
   }
 };
 
-let values: any;
+let values: { 'env-file'?: string; help?: boolean };
 try {
   const parsed = parseArgs({ options, allowPositionals: false });
   values = parsed.values;

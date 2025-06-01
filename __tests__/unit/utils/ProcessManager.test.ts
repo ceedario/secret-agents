@@ -1,4 +1,4 @@
-import { ProcessManager } from '../../../src/utils/ProcessManager.mjs';
+import { ProcessManager } from '../../../src/utils/ProcessManager.js';
 import * as childProcess from 'child_process';
 import { jest } from '@jest/globals';
 

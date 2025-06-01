@@ -1,4 +1,4 @@
-import { FileSystem } from '../../../src/utils/FileSystem.mjs';
+import { FileSystem } from '../../../src/utils/FileSystem.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';

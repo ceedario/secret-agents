@@ -594,7 +594,7 @@ export class ExpressWebhookService extends WebhookService {
           console.log(`Received OAuth callback with code: ${code.substring(0, 5)}...`);
           
           // Process the OAuth callback
-          const tokenInfo = await this.oauthHelper!.handleCallback(code, state || '');
+          await this.oauthHelper!.handleCallback(code, state || '');
           
           console.log('OAuth flow completed successfully');
           

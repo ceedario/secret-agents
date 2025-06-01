@@ -8,13 +8,13 @@
   },
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
-    "dev": "nodemon dist/index.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "oauth:server": "node scripts/start-auth-server.mjs",
-    "oauth:reset": "node scripts/reset-oauth.mjs"
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "oauth:server": "ts-node scripts/start-auth-server.ts",
+    "oauth:reset": "ts-node scripts/reset-oauth.ts"
   },
   "keywords": [
     "linear",
@@ -53,6 +53,8 @@
     "jest": "^29.7.0",
     "jest-environment-node": "^29.7.0",
     "nodemon": "^2.0.22",
+    "ts-jest": "^29.3.4",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }
 }

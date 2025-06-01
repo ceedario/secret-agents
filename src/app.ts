@@ -52,9 +52,9 @@ export class App {
         
         if (issues && issues.length > 0) {
           console.log(`Found ${issues.length} assigned issues. Checking for existing workspaces...`);
-          issues.forEach(issue => {
+          issues.forEach((issue: any) => {
             // Pass true to indicate this is a startup initialization
-            issueService.initializeIssueSession(issue, true).catch(err => {
+            issueService.initializeIssueSession(issue, true).catch((err: any) => {
               console.error(`Failed to initialize session for issue ${issue.identifier}:`, err);
             });
           });

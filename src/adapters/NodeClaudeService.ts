@@ -1,5 +1,4 @@
 import { ChildProcess } from 'child_process';
-import path from 'path';
 
 import { ClaudeService } from '../services/ClaudeService.js';
 import { Session } from '../core/Session.js';
@@ -887,7 +886,6 @@ CLAUDE_INPUT_EOF`;
         }
         
         // Create a shell script to properly handle the continuation
-        const escapedComment = commentText.replace(/'/g, "'\\''");
         const claudeArgs = claudeConfig.getContinueArgs(allowedTools, workspace.path);
         
         // Log the arguments for debugging

@@ -1,4 +1,4 @@
-import { HttpServer } from '../../../src/utils/HttpServer.mjs';
+import { HttpServer } from '../../../src/utils/HttpServer.js';
 import express from 'express';
 import { jest } from '@jest/globals';
 

@@ -1,4 +1,4 @@
-import { ExpressWebhookService } from '../../../src/adapters/ExpressWebhookService.mjs';
+import { ExpressWebhookService } from '../../../src/adapters/ExpressWebhookService.js';
 import { jest } from '@jest/globals';
 
 describe('ExpressWebhookService', () => {

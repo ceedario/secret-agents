@@ -709,7 +709,6 @@ export class LinearIssueService extends IssueService {
       
       // Extract relevant information from notification data using safer property access
       const issueId = data.issueId;
-      const commentId = data.commentId;
       const commentContent = data.comment?.body;
       const actor = data.actor?.name || 'Unknown user';
       

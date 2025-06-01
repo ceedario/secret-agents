@@ -33,17 +33,15 @@ export interface Issue {
  * Utility class for downloading attachments from Linear with proper authentication
  */
 export class AttachmentDownloader {
-  private linearClient: LinearClient
   private fileSystem: FileSystem
   private oauthHelper: OAuthHelper | null
 
   /**
-   * @param linearClient - Linear API client
+   * @param linearClient - Linear API client (unused but kept for compatibility)
    * @param fileSystem - File system utility
    * @param oauthHelper - OAuth helper for token retrieval
    */
   constructor(linearClient: LinearClient, fileSystem: FileSystem, oauthHelper: OAuthHelper | null = null) {
-    this.linearClient = linearClient
     this.fileSystem = fileSystem
     this.oauthHelper = oauthHelper
   }

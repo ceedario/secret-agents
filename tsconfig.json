@@ -19,11 +19,20 @@
     "noUnusedParameters": false,
     "outDir": "./dist",
     "pretty": true,
-    "rootDir": "./src",
+    "rootDir": "./",
     "strict": true,
     "strictFunctionTypes": true,
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
     "target": "ESNext"
-  }
+  },
+  "include": [
+    "src/**/*",
+    "__tests__/**/*",
+    "scripts/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
