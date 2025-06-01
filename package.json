@@ -2,20 +2,22 @@
   "name": "linear-claude-agent",
   "version": "1.0.0",
   "description": "Integration between Linear and Claude for automated issue processing using Linear's Agent API",
-  "main": "index.mjs",
+  "main": "dist/index.js",
   "bin": {
-    "linear-claude-agent": "./index.mjs"
+    "linear-claude-agent": "./dist/index.js"
   },
   "type": "module",
   "scripts": {
-    "start": "node index.mjs",
-    "dev": "nodemon index.mjs",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "dev": "nodemon --exec ts-node src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "oauth:server": "node scripts/start-auth-server.mjs",
-    "oauth:reset": "node scripts/reset-oauth.mjs"
+    "lint": "tsc --noEmit -p tsconfig.lint.json",
+    "oauth:server": "ts-node scripts/start-auth-server.ts",
+    "oauth:reset": "ts-node scripts/reset-oauth.ts"
   },
   "packageManager": "pnpm@10.11.0",
   "keywords": [
@@ -47,8 +49,14 @@
     "zod": "^3.24.4"
   },
   "devDependencies": {
+    "@types/express": "^5.0.2",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.15.29",
+    "@types/node-fetch": "^2.6.12",
     "@vitest/ui": "^3.1.4",
     "nodemon": "^2.0.22",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
     "vitest": "^3.1.4"
   }
 }

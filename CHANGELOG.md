@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- TypeScript support for the entire codebase
+  - Migrated all JavaScript files (.mjs) to TypeScript (.ts)
+  - Added comprehensive type definitions for all classes and interfaces
+  - Configured TypeScript with strict mode for better type safety
+  - Added build script to compile TypeScript to JavaScript
+  - Added TypeScript dependencies: typescript, ts-node, and type definitions
+  - Created tsconfig.json with provided strict configuration
+  - dist/ folder added to .gitignore for TypeScript build output
 - Vitest as the new test runner, replacing Jest
   - Provides significantly faster test execution
   - Maintains full compatibility with existing test APIs
@@ -17,15 +25,15 @@ All notable changes to this project will be documented in this file.
   - Gracefully handles download failures with informative warnings
   - Replaces the previous ImageDownloader with a more comprehensive solution
 
-### Removed
-- Jest test runner and related dependencies (@types/jest, jest-environment-node)
-- Jest configuration file (jest.config.mjs)
-- Coverage folder from git tracking (now properly ignored)
-- ImageDownloader class (replaced by AttachmentDownloader)
-  - All image handling functionality is now provided by AttachmentDownloader
-  - Removed ImageDownloader tests, exports, and container registration
-
-### Changed
+### Changed  
+- All source files from ES modules (.mjs) to TypeScript (.ts)
+- Build output now goes to dist/ directory
+- Package.json main entry point updated to dist/index.js
+- Added TypeScript compilation step before running the application
+- Dev script now uses ts-node to run TypeScript directly without compilation
+- All test files migrated from .mjs to .ts
+- Test configuration to use vitest with TypeScript support
+- Updated all imports to use .js extensions as per TypeScript ES module standards
 - Migrated from npm to pnpm package manager
   - Replaced package-lock.json with pnpm-lock.yaml
   - Updated all documentation to use pnpm commands
@@ -72,7 +80,24 @@ All notable changes to this project will be documented in this file.
   - No longer relies on URL extensions which Linear doesn't provide
   - Falls back to .png if file type cannot be determined
 
+### Removed
+- Jest test runner and related dependencies (@types/jest, jest-environment-node)
+- Jest configuration file (jest.config.mjs) 
+- Coverage folder from git tracking (now properly ignored)
+- ImageDownloader class (replaced by AttachmentDownloader)
+  - All image handling functionality is now provided by AttachmentDownloader
+  - Removed ImageDownloader tests, exports, and container registration
+- Experimental Node.js flags from test scripts
+
 ### Fixed
+- TypeScript compilation errors in source files
+  - Fixed import statements for Node.js built-in modules (crypto, os, path)
+  - Added proper type annotations for parseArgs options
+  - Fixed unused variable warnings (tokenInfo in ExpressWebhookService)
+  - Removed unused imports (ChildProcessWithoutNullStreams, path)
+  - Fixed error handling with proper type assertions
+  - Updated tsconfig.json with ES2022 module and target for top-level await support
+  - Added allowSyntheticDefaultImports for better module compatibility
 - Agent now correctly identifies itself using its Linear username instead of "Claude"
   - Prompt template now uses dynamic `{{agent_name}}` placeholder
   - Agent name is fetched from Linear API and injected into prompts
