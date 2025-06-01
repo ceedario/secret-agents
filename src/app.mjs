@@ -31,6 +31,9 @@ export class App {
       // Initialize the application
       await this.init();
       
+      // Say hello! 🙂
+      console.log('👋 Hello from Linear Claude Agent!');
+      
       // Get configuration
       const config = this.container.get('config');
       
