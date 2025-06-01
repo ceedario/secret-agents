@@ -15,7 +15,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit -p tsconfig.lint.json",
     "oauth:server": "ts-node scripts/start-auth-server.ts",
     "oauth:reset": "ts-node scripts/reset-oauth.ts"
   },
