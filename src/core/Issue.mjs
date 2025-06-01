@@ -14,6 +14,7 @@ export class Issue {
     assigneeId,
     comments = { nodes: [] },
     branchName,
+    blockedByIssues = [],
   }) {
     this.id = id;
     this.identifier = identifier;
@@ -26,6 +27,7 @@ export class Issue {
     this.assigneeId = assigneeId;
     this.comments = comments;
     this.branchName = branchName;
+    this.blockedByIssues = blockedByIssues;
   }
 
   /**
@@ -84,5 +86,24 @@ export class Issue {
    */
   getBranchName() {
     return this.branchName || this.identifier.toLowerCase();
+  }
+
+  /**
+   * Check if the issue is blocked by other issues
+   * @returns {boolean} - True if the issue is blocked
+   */
+  isBlocked() {
+    return this.blockedByIssues && this.blockedByIssues.length > 0;
+  }
+
+  /**
+   * Get the list of blocking issue identifiers
+   * @returns {Array<string>} - Array of blocking issue identifiers
+   */
+  getBlockingIssueIdentifiers() {
+    if (!this.blockedByIssues || this.blockedByIssues.length === 0) {
+      return [];
+    }
+    return this.blockedByIssues.map(issue => issue.identifier || issue.id);
   }
 }

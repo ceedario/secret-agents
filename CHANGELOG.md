@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
   - Automatically detects file types and categorizes them as images or other attachments
   - Gracefully handles download failures with informative warnings
   - Replaces the previous ImageDownloader with a more comprehensive solution
+- Blocked issue handling to prevent work on issues that are blocked by other issues
+  - Automatically detects when an issue is blocked via Linear's issue relations
+  - Posts a comment asking for permission before proceeding with blocked issues
+  - Remembers permission once granted to avoid asking repeatedly
+  - Supports multiple blocking issues with clear messaging
 
 ### Removed
 - Coverage folder from git tracking (now properly ignored)
