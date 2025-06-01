@@ -116,14 +116,12 @@ describe('App', () => {
       // Create app instance
       const app = new App();
       
-      // Create a special mock function that will throw when invoked
-      const mockValidateFn = vi.fn().mockImplementation(() => {
+      // Mock the config object's validate method directly
+      const config = (app as any).container.get('config');
+      const originalValidate = config.validate;
+      config.validate = vi.fn().mockImplementation(() => {
         throw new Error('Configuration validation error');
       });
-      
-      // Replace the validate method
-      const originalValidate = (app as any).container.get('config').validate;
-      (app as any).container.get('config').validate = mockValidateFn;
       
       // Spy on console.error
       const consoleErrorSpy = vi.spyOn(console, 'error');
@@ -143,8 +141,8 @@ describe('App', () => {
       // Verify shutdown was called
       expect(app.shutdown).toHaveBeenCalled();
       
-      // Restore original method
-      (app as any).container.get('config').validate = originalValidate;
+      // Restore original validate method
+      config.validate = originalValidate;
     });
   });
   

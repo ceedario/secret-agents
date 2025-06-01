@@ -1,144 +1,175 @@
-import { FileSystem } from '../../../src/utils/FileSystem.js';
-import fs from 'fs-extra';
-import path from 'path';
-import os from 'os';
-import { vi } from 'vitest';
+import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 
-// Create a simple test suite that verifies the FileSystem class properly forwards calls to the underlying implementations
+// Mock the modules before any imports
+vi.mock('fs-extra', () => ({
+  pathExists: vi.fn(),
+  ensureDir: vi.fn(),
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+  appendFile: vi.fn(),
+  readdir: vi.fn(),
+  stat: vi.fn(),
+  remove: vi.fn(),
+  ensureDirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  existsSync: vi.fn(),
+  rename: vi.fn()
+}));
+
+vi.mock('path', () => ({
+  join: vi.fn(),
+  basename: vi.fn(),
+  dirname: vi.fn()
+}));
+
+vi.mock('os', () => ({
+  homedir: vi.fn()
+}));
+
+import { FileSystem } from '../../../src/utils/FileSystem.js';
+import * as fs from 'fs-extra';
+import * as path from 'path';
+import * as os from 'os';
+
 describe('FileSystem', () => {
   let fileSystem;
-  
+
   beforeEach(() => {
     fileSystem = new FileSystem();
+    vi.clearAllMocks();
   });
-  
-  test('pathExists forwards to fs.pathExists', () => {
-    const mockPath = '/test/path';
-    vi.spyOn(fs, 'pathExists').mockImplementation(() => Promise.resolve(true));
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  test('pathExists forwards to fs.pathExists', async () => {
+    const mockFilePath = '/test/path';
+    vi.mocked(fs.pathExists).mockResolvedValue(true);
     
-    fileSystem.pathExists(mockPath);
-    expect(fs.pathExists).toHaveBeenCalledWith(mockPath);
+    await fileSystem.pathExists(mockFilePath);
+    expect(fs.pathExists).toHaveBeenCalledWith(mockFilePath);
   });
-  
-  test('ensureDir forwards to fs.ensureDir', () => {
-    const mockPath = '/test/path';
-    vi.spyOn(fs, 'ensureDir').mockImplementation(() => Promise.resolve());
+
+  test('ensureDir forwards to fs.ensureDir', async () => {
+    const mockDirPath = '/test/path';
+    vi.mocked(fs.ensureDir).mockResolvedValue(undefined);
     
-    fileSystem.ensureDir(mockPath);
-    expect(fs.ensureDir).toHaveBeenCalledWith(mockPath);
+    await fileSystem.ensureDir(mockDirPath);
+    expect(fs.ensureDir).toHaveBeenCalledWith(mockDirPath);
   });
-  
-  test('readFile forwards to fs.readFile', () => {
-    const mockPath = '/test/file.txt';
+
+  test('readFile forwards to fs.readFile', async () => {
+    const mockFilePath = '/test/file.txt';
     const mockEncoding = 'utf-8';
-    vi.spyOn(fs, 'readFile').mockImplementation(() => Promise.resolve('test content'));
+    vi.mocked(fs.readFile).mockResolvedValue('test content');
     
-    fileSystem.readFile(mockPath, mockEncoding);
-    expect(fs.readFile).toHaveBeenCalledWith(mockPath, mockEncoding);
+    await fileSystem.readFile(mockFilePath, mockEncoding);
+    expect(fs.readFile).toHaveBeenCalledWith(mockFilePath, mockEncoding);
   });
-  
-  test('writeFile forwards to fs.writeFile', () => {
-    const mockPath = '/test/file.txt';
+
+  test('writeFile forwards to fs.writeFile', async () => {
+    const mockFilePath = '/test/file.txt';
     const mockContent = 'test content';
-    vi.spyOn(fs, 'writeFile').mockImplementation(() => Promise.resolve());
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
     
-    fileSystem.writeFile(mockPath, mockContent);
-    expect(fs.writeFile).toHaveBeenCalledWith(mockPath, mockContent);
+    await fileSystem.writeFile(mockFilePath, mockContent);
+    expect(fs.writeFile).toHaveBeenCalledWith(mockFilePath, mockContent);
   });
-  
-  test('appendFile forwards to fs.appendFile', () => {
-    const mockPath = '/test/file.txt';
+
+  test('appendFile forwards to fs.appendFile', async () => {
+    const mockFilePath = '/test/file.txt';
     const mockContent = 'test content';
-    vi.spyOn(fs, 'appendFile').mockImplementation(() => Promise.resolve());
+    vi.mocked(fs.appendFile).mockResolvedValue(undefined);
     
-    fileSystem.appendFile(mockPath, mockContent);
-    expect(fs.appendFile).toHaveBeenCalledWith(mockPath, mockContent);
+    await fileSystem.appendFile(mockFilePath, mockContent);
+    expect(fs.appendFile).toHaveBeenCalledWith(mockFilePath, mockContent);
   });
-  
-  test('readDir forwards to fs.readdir', () => {
-    const mockPath = '/test/dir';
-    vi.spyOn(fs, 'readdir').mockImplementation(() => Promise.resolve(['file1.txt', 'file2.txt']));
+
+  test('readDir forwards to fs.readdir', async () => {
+    const mockDirPath = '/test/dir';
+    vi.mocked(fs.readdir).mockResolvedValue(['file1.txt', 'file2.txt'] as any);
     
-    fileSystem.readDir(mockPath);
-    expect(fs.readdir).toHaveBeenCalledWith(mockPath);
+    await fileSystem.readDir(mockDirPath);
+    expect(fs.readdir).toHaveBeenCalledWith(mockDirPath);
   });
-  
-  test('stat forwards to fs.stat', () => {
-    const mockPath = '/test/file.txt';
-    vi.spyOn(fs, 'stat').mockImplementation(() => Promise.resolve({ isDirectory: () => false }));
+
+  test('stat forwards to fs.stat', async () => {
+    const mockFilePath = '/test/file.txt';
+    vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => false } as any);
     
-    fileSystem.stat(mockPath);
-    expect(fs.stat).toHaveBeenCalledWith(mockPath);
+    await fileSystem.stat(mockFilePath);
+    expect(fs.stat).toHaveBeenCalledWith(mockFilePath);
   });
-  
-  test('remove forwards to fs.remove', () => {
-    const mockPath = '/test/file.txt';
-    vi.spyOn(fs, 'remove').mockImplementation(() => Promise.resolve());
+
+  test('remove forwards to fs.remove', async () => {
+    const mockFilePath = '/test/file.txt';
+    vi.mocked(fs.remove).mockResolvedValue(undefined);
     
-    fileSystem.remove(mockPath);
-    expect(fs.remove).toHaveBeenCalledWith(mockPath);
+    await fileSystem.remove(mockFilePath);
+    expect(fs.remove).toHaveBeenCalledWith(mockFilePath);
   });
-  
+
   test('joinPath forwards to path.join', () => {
     const mockPaths = ['/test', 'dir', 'file.txt'];
-    vi.spyOn(path, 'join').mockImplementation(() => '/test/dir/file.txt');
+    vi.mocked(path.join).mockReturnValue('/test/dir/file.txt');
     
     fileSystem.joinPath(...mockPaths);
     expect(path.join).toHaveBeenCalledWith(...mockPaths);
   });
-  
+
   test('basename forwards to path.basename', () => {
-    const mockPath = '/test/dir/file.txt';
-    vi.spyOn(path, 'basename').mockImplementation(() => 'file.txt');
+    const mockFilePath = '/test/dir/file.txt';
+    vi.mocked(path.basename).mockReturnValue('file.txt');
     
-    fileSystem.basename(mockPath);
-    expect(path.basename).toHaveBeenCalledWith(mockPath);
+    fileSystem.basename(mockFilePath);
+    expect(path.basename).toHaveBeenCalledWith(mockFilePath);
   });
-  
+
   test('dirname forwards to path.dirname', () => {
-    const mockPath = '/test/dir/file.txt';
-    vi.spyOn(path, 'dirname').mockImplementation(() => '/test/dir');
+    const mockFilePath = '/test/dir/file.txt';
+    vi.mocked(path.dirname).mockReturnValue('/test/dir');
     
-    fileSystem.dirname(mockPath);
-    expect(path.dirname).toHaveBeenCalledWith(mockPath);
+    fileSystem.dirname(mockFilePath);
+    expect(path.dirname).toHaveBeenCalledWith(mockFilePath);
   });
-  
+
   test('homedir forwards to os.homedir', () => {
-    vi.spyOn(os, 'homedir').mockImplementation(() => '/home/user');
+    vi.mocked(os.homedir).mockReturnValue('/home/user');
     
     fileSystem.homedir();
     expect(os.homedir).toHaveBeenCalled();
   });
-  
+
   test('ensureDirSync forwards to fs.ensureDirSync', () => {
-    const mockPath = '/test/dir';
-    vi.spyOn(fs, 'ensureDirSync').mockImplementation(() => {});
+    const mockDirPath = '/test/dir';
+    vi.mocked(fs.ensureDirSync).mockReturnValue(undefined);
     
-    fileSystem.ensureDirSync(mockPath);
-    expect(fs.ensureDirSync).toHaveBeenCalledWith(mockPath);
+    fileSystem.ensureDirSync(mockDirPath);
+    expect(fs.ensureDirSync).toHaveBeenCalledWith(mockDirPath);
   });
-  
+
   test('writeFileSync forwards to fs.writeFileSync', () => {
-    const mockPath = '/test/file.txt';
+    const mockFilePath = '/test/file.txt';
     const mockContent = 'test content';
-    vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+    vi.mocked(fs.writeFileSync).mockReturnValue(undefined);
     
-    fileSystem.writeFileSync(mockPath, mockContent);
-    expect(fs.writeFileSync).toHaveBeenCalledWith(mockPath, mockContent);
+    fileSystem.writeFileSync(mockFilePath, mockContent);
+    expect(fs.writeFileSync).toHaveBeenCalledWith(mockFilePath, mockContent);
   });
-  
+
   test('existsSync forwards to fs.existsSync', () => {
-    const mockPath = '/test/file.txt';
-    vi.spyOn(fs, 'existsSync').mockImplementation(() => true);
+    const mockFilePath = '/test/file.txt';
+    vi.mocked(fs.existsSync).mockReturnValue(true);
     
-    fileSystem.existsSync(mockPath);
-    expect(fs.existsSync).toHaveBeenCalledWith(mockPath);
+    fileSystem.existsSync(mockFilePath);
+    expect(fs.existsSync).toHaveBeenCalledWith(mockFilePath);
   });
-  
+
   test('rename forwards to fs.rename', async () => {
     const oldPath = '/test/oldfile.txt';
     const newPath = '/test/newfile.txt';
-    vi.spyOn(fs, 'rename').mockImplementation(() => Promise.resolve());
+    vi.mocked(fs.rename).mockResolvedValue(undefined);
     
     await fileSystem.rename(oldPath, newPath);
     expect(fs.rename).toHaveBeenCalledWith(oldPath, newPath);

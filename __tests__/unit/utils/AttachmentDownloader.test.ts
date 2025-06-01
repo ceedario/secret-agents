@@ -103,7 +103,7 @@ describe('AttachmentDownloader', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        buffer: vi.fn().mockResolvedValue(mockBuffer)
+        arrayBuffer: vi.fn().mockResolvedValue(mockBuffer.buffer.slice(mockBuffer.byteOffset, mockBuffer.byteOffset + mockBuffer.byteLength))
       })
       
       // Mock file type detection for image
@@ -133,7 +133,7 @@ describe('AttachmentDownloader', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        buffer: vi.fn().mockResolvedValue(mockBuffer)
+        arrayBuffer: vi.fn().mockResolvedValue(mockBuffer.buffer.slice(mockBuffer.byteOffset, mockBuffer.byteOffset + mockBuffer.byteLength))
       })
       
       // Mock file type detection returning null (unknown type)
@@ -154,7 +154,7 @@ describe('AttachmentDownloader', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        buffer: vi.fn().mockResolvedValue(mockBuffer)
+        arrayBuffer: vi.fn().mockResolvedValue(mockBuffer.buffer.slice(mockBuffer.byteOffset, mockBuffer.byteOffset + mockBuffer.byteLength))
       })
       
       // Mock file type detection for PDF
@@ -177,7 +177,7 @@ describe('AttachmentDownloader', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        buffer: vi.fn().mockResolvedValue(mockBuffer)
+        arrayBuffer: vi.fn().mockResolvedValue(mockBuffer.buffer.slice(mockBuffer.byteOffset, mockBuffer.byteOffset + mockBuffer.byteLength))
       })
       
       fileTypeFromBuffer.mockResolvedValueOnce(null)
@@ -253,15 +253,15 @@ describe('AttachmentDownloader', () => {
       fetch
         .mockResolvedValueOnce({
           ok: true,
-          buffer: vi.fn().mockResolvedValue(mockImageBuffer)
+          arrayBuffer: vi.fn().mockResolvedValue(mockImageBuffer.buffer.slice(mockImageBuffer.byteOffset, mockImageBuffer.byteOffset + mockImageBuffer.byteLength))
         })
         .mockResolvedValueOnce({
           ok: true,
-          buffer: vi.fn().mockResolvedValue(mockJsonlBuffer)
+          arrayBuffer: vi.fn().mockResolvedValue(mockJsonlBuffer.buffer.slice(mockJsonlBuffer.byteOffset, mockJsonlBuffer.byteOffset + mockJsonlBuffer.byteLength))
         })
         .mockResolvedValueOnce({
           ok: true,
-          buffer: vi.fn().mockResolvedValue(mockPdfBuffer)
+          arrayBuffer: vi.fn().mockResolvedValue(mockPdfBuffer.buffer.slice(mockPdfBuffer.byteOffset, mockPdfBuffer.byteOffset + mockPdfBuffer.byteLength))
         })
 
       fileTypeFromBuffer
@@ -297,7 +297,7 @@ describe('AttachmentDownloader', () => {
       fetch
         .mockResolvedValueOnce({
           ok: true,
-          buffer: vi.fn().mockResolvedValue(Buffer.from('data'))
+          arrayBuffer: vi.fn().mockResolvedValue(Buffer.from('data').buffer.slice(0, Buffer.from('data').byteLength))
         })
         .mockResolvedValueOnce({
           ok: false,
@@ -330,7 +330,7 @@ describe('AttachmentDownloader', () => {
       const mockBuffer = Buffer.from('data')
       fetch.mockResolvedValue({
         ok: true,
-        buffer: vi.fn().mockResolvedValue(mockBuffer)
+        arrayBuffer: vi.fn().mockResolvedValue(mockBuffer.buffer.slice(mockBuffer.byteOffset, mockBuffer.byteOffset + mockBuffer.byteLength))
       })
       fileTypeFromBuffer.mockResolvedValue({ ext: 'pdf', mime: 'application/pdf' })
 
