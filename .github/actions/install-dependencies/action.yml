@@ -1,0 +1,21 @@
+name: 'Install Dependencies'
+description: 'Sets up Node.js and pnpm, then installs dependencies'
+runs:
+  using: 'composite'
+  steps:
+    - name: Extract pnpm version
+      shell: bash
+      run: |
+        PNPM_VERSION=$(node -e "console.log(require('./package.json').packageManager.split('@')[1])")
+        if [ -z "$PNPM_VERSION" ]; then
+          echo "Unable to extract pnpm version from package.json"
+          exit 1
+        fi
+        echo "PNPM_VERSION=$PNPM_VERSION" >> $GITHUB_ENV
+        echo "Installing pnpm version: $PNPM_VERSION"
+    
+    - name: Install dependencies with pnpm
+      uses: wyvox/action-setup-pnpm@v3
+      with:
+        pnpm-version: ${{ env.PNPM_VERSION }}
+        args: --frozen-lockfile --strict-peer-dependencies

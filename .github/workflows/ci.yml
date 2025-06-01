@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+    
+    - name: Install dependencies
+      uses: ./.github/actions/install-dependencies
+    
+    - name: Create .env file
+      run: |
+        cat > .env << EOF
+        LINEAR_WEBHOOK_SECRET=test
+        WEBHOOK_PORT=3000
+        CLAUDE_PATH=/bin/echo
+        WORKSPACE_BASE_DIR=./tmp/workspaces
+        PROMPT_TEMPLATE_PATH=./examples/prompt-template.txt
+        ANTHROPIC_API_KEY=test
+        EOF
+    
+    - run: pnpm test
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        directory: ./coverage/
+        fail_ci_if_error: false

@@ -1,11 +1,11 @@
 import { App } from '../../src/app.js';
-import { jest } from '@jest/globals';
+import { vi, describe, beforeEach, it, expect } from 'vitest';
 
 // Mock the dotenv config
-jest.mock('dotenv/config', () => {});
+vi.mock('dotenv/config', () => {});
 
 // Mock the env config to avoid validation errors
-jest.mock('../../src/config/env.js', () => {
+vi.mock('../../src/config/env.js', () => {
   return {
     default: {
       linear: {
@@ -24,36 +24,36 @@ jest.mock('../../src/config/env.js', () => {
       workspace: {
         baseDir: '/mock/workspace',
       },
-      validate: jest.fn().mockReturnValue(true),
+      validate: vi.fn().mockReturnValue(true),
     }
   };
 });
 
 // Mock container components
-jest.mock('../../src/container.js', () => {
+vi.mock('../../src/container.js', async () => {
   const mockWebhookServer = {
-    close: jest.fn()
+    close: vi.fn()
   };
   
   const mockIssueService = {
-    fetchAssignedIssues: jest.fn().mockResolvedValue([]),
-    initializeIssueSession: jest.fn().mockResolvedValue(true)
+    fetchAssignedIssues: vi.fn().mockResolvedValue([]),
+    initializeIssueSession: vi.fn().mockResolvedValue(true)
   };
   
   const mockWebhookService = {
-    startServer: jest.fn().mockResolvedValue(mockWebhookServer)
+    startServer: vi.fn().mockResolvedValue(mockWebhookServer)
   };
   
   const mockWorkspaceService = {
-    setupBaseDir: jest.fn().mockResolvedValue('/mock/workspace'),
-    cleanupAllWorkspaces: jest.fn().mockResolvedValue()
+    setupBaseDir: vi.fn().mockResolvedValue('/mock/workspace'),
+    cleanupAllWorkspaces: vi.fn().mockResolvedValue()
   };
   
-  // Import the mocked config
-  const mockConfig = require('../../src/config/env.mjs').default;
+  // Import the mocked config using dynamic import
+  const { default: mockConfig } = await import('../../src/config/env.js');
   
   const mockContainer = {
-    get: jest.fn((name) => {
+    get: vi.fn((name) => {
       switch (name) {
         case 'config':
           return mockConfig;
@@ -70,14 +70,14 @@ jest.mock('../../src/container.js', () => {
   };
   
   return {
-    createContainer: jest.fn().mockReturnValue(mockContainer)
+    createContainer: vi.fn().mockReturnValue(mockContainer)
   };
 });
 
 describe('App', () => {
   // Reset mocks before each test
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
   
   describe('start', () => {
@@ -87,7 +87,7 @@ describe('App', () => {
       const app = new App();
       
       // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log');
+      const consoleLogSpy = vi.spyOn(console, 'log');
       
       // Start the app
       await app.start();
@@ -117,7 +117,7 @@ describe('App', () => {
       const app = new App();
       
       // Create a special mock function that will throw when invoked
-      const mockValidateFn = jest.fn().mockImplementation(() => {
+      const mockValidateFn = vi.fn().mockImplementation(() => {
         throw new Error('Configuration validation error');
       });
       
@@ -126,10 +126,10 @@ describe('App', () => {
       app.container.get('config').validate = mockValidateFn;
       
       // Spy on console.error
-      const consoleErrorSpy = jest.spyOn(console, 'error');
+      const consoleErrorSpy = vi.spyOn(console, 'error');
       
       // Mock shutdown method
-      app.shutdown = jest.fn().mockResolvedValue();
+      app.shutdown = vi.fn().mockResolvedValue();
       
       // Start the app and expect it to throw
       await expect(app.start()).rejects.toThrow('Configuration validation error');
@@ -154,10 +154,10 @@ describe('App', () => {
       const app = new App();
       
       // Set up webhook server
-      app.webhookServer = { close: jest.fn() };
+      app.webhookServer = { close: vi.fn() };
       
       // Spy on console.log
-      const consoleLogSpy = jest.spyOn(console, 'log');
+      const consoleLogSpy = vi.spyOn(console, 'log');
       
       // Shut down the app
       await app.shutdown();
@@ -179,7 +179,7 @@ describe('App', () => {
       const app = new App();
       
       // Set up webhook server
-      app.webhookServer = { close: jest.fn() };
+      app.webhookServer = { close: vi.fn() };
       
       // Set isShuttingDown flag
       app.isShuttingDown = true;

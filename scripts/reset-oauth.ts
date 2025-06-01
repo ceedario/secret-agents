@@ -5,18 +5,17 @@
  * Run with: node scripts/reset-oauth.mjs [--env-file <path>]
  */
 
-import fs from 'fs-extra';
-import path from 'path';
-import dotenv from 'dotenv';
+import * as fs from 'fs-extra';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
 import { parseArgs } from 'node:util';
 
 // Parse command line arguments
 const options = {
   'env-file': {
-    type: 'string',
+    type: 'string' as const,
     short: 'e',
-    default: '.env.secret-agents',
-    description: 'Path to the environment file'
+    default: '.env.secret-agents'
   }
 };
 
@@ -25,12 +24,12 @@ try {
   const parsed = parseArgs({ options, allowPositionals: false });
   values = parsed.values;
 } catch (err) {
-  console.error(`Error: ${err.message}`);
+  console.error(`Error: ${(err as Error).message}`);
   process.exit(1);
 }
 
 // Load environment variables from the specified file
-dotenv.config({ path: values['env-file'] });
+dotenv.config({ path: values['env-file'] as string });
 
 // Get the workspace base directory from environment
 const baseDir = process.env.WORKSPACE_BASE_DIR || './workspaces';

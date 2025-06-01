@@ -6,19 +6,18 @@
  */
 
 import express from 'express';
-import dotenv from 'dotenv';
-import { OAuthHelper } from '../src/utils/OAuthHelper.mjs';
-import { FileSystem } from '../src/utils/FileSystem.mjs';
+import * as dotenv from 'dotenv';
+import { OAuthHelper } from '../src/utils/OAuthHelper.js';
+import { FileSystem } from '../src/utils/FileSystem.js';
 import fetch from 'node-fetch'; // Ensure node-fetch is used in Node.js environment
 import { parseArgs } from 'node:util';
 
 // Parse command line arguments
 const options = {
   'env-file': {
-    type: 'string',
+    type: 'string' as const,
     short: 'e',
-    default: '.env.secret-agents',
-    description: 'Path to the environment file'
+    default: '.env.secret-agents'
   }
 };
 
@@ -27,12 +26,12 @@ try {
   const parsed = parseArgs({ options, allowPositionals: false });
   values = parsed.values;
 } catch (err) {
-  console.error(`Error: ${err.message}`);
+  console.error(`Error: ${(err as Error).message}`);
   process.exit(1);
 }
 
 // Load environment variables from the specified file
-dotenv.config({ path: values['env-file'] });
+dotenv.config({ path: values['env-file'] as string });
 
 // Initialize dependencies
 const fileSystem = new FileSystem();
@@ -81,23 +80,24 @@ async function startServer() {
         res.redirect(authUrl);
       } catch (error) {
         console.error('Error generating OAuth URL:', error);
-        res.status(500).send('Error setting up OAuth flow: ' + error.message);
+        res.status(500).send('Error setting up OAuth flow: ' + (error as Error).message);
       }
     });
     
     // OAuth callback endpoint
-    app.get('/oauth/callback', async (req, res) => {
+    app.get('/oauth/callback', async (req, res): Promise<void> => {
       try {
-        const { code, state } = req.query;
+        const { code, state } = req.query as { code?: string; state?: string };
         
         if (!code) {
-          return res.status(400).send('Authorization code missing');
+          res.status(400).send('Authorization code missing');
+          return;
         }
         
         console.log(`Received OAuth callback with code: ${code.substring(0, 5)}...`);
         
         // Process the OAuth callback
-        const tokenInfo = await oauthHelper.handleCallback(code, state);
+        await oauthHelper.handleCallback(code, state || '');
         
         console.log('OAuth flow completed successfully');
         res.status(200).send(`
@@ -144,7 +144,7 @@ async function startServer() {
               <div class="container">
                 <h1 class="error">Authentication Error</h1>
                 <p>There was an error processing your OAuth callback:</p>
-                <pre>${error.message}</pre>
+                <pre>${(error as Error).message}</pre>
               </div>
             </body>
           </html>
@@ -164,7 +164,7 @@ async function startServer() {
         res.redirect('/oauth/authorize');
       } catch (error) {
         console.error('Error resetting OAuth:', error);
-        res.status(500).send('Error resetting OAuth: ' + error.message);
+        res.status(500).send('Error resetting OAuth: ' + (error as Error).message);
       }
     });
     
@@ -184,7 +184,7 @@ async function startServer() {
         res.status(500).json({
           hasValidToken: false,
           isApiValid: false,
-          error: error.message
+          error: (error as Error).message
         });
       }
     });

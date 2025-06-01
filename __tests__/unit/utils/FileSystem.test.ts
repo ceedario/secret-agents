@@ -2,7 +2,7 @@ import { FileSystem } from '../../../src/utils/FileSystem.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
 // Create a simple test suite that verifies the FileSystem class properly forwards calls to the underlying implementations
 describe('FileSystem', () => {
@@ -14,7 +14,7 @@ describe('FileSystem', () => {
   
   test('pathExists forwards to fs.pathExists', () => {
     const mockPath = '/test/path';
-    jest.spyOn(fs, 'pathExists').mockImplementation(() => Promise.resolve(true));
+    vi.spyOn(fs, 'pathExists').mockImplementation(() => Promise.resolve(true));
     
     fileSystem.pathExists(mockPath);
     expect(fs.pathExists).toHaveBeenCalledWith(mockPath);
@@ -22,7 +22,7 @@ describe('FileSystem', () => {
   
   test('ensureDir forwards to fs.ensureDir', () => {
     const mockPath = '/test/path';
-    jest.spyOn(fs, 'ensureDir').mockImplementation(() => Promise.resolve());
+    vi.spyOn(fs, 'ensureDir').mockImplementation(() => Promise.resolve());
     
     fileSystem.ensureDir(mockPath);
     expect(fs.ensureDir).toHaveBeenCalledWith(mockPath);
@@ -31,7 +31,7 @@ describe('FileSystem', () => {
   test('readFile forwards to fs.readFile', () => {
     const mockPath = '/test/file.txt';
     const mockEncoding = 'utf-8';
-    jest.spyOn(fs, 'readFile').mockImplementation(() => Promise.resolve('test content'));
+    vi.spyOn(fs, 'readFile').mockImplementation(() => Promise.resolve('test content'));
     
     fileSystem.readFile(mockPath, mockEncoding);
     expect(fs.readFile).toHaveBeenCalledWith(mockPath, mockEncoding);
@@ -40,7 +40,7 @@ describe('FileSystem', () => {
   test('writeFile forwards to fs.writeFile', () => {
     const mockPath = '/test/file.txt';
     const mockContent = 'test content';
-    jest.spyOn(fs, 'writeFile').mockImplementation(() => Promise.resolve());
+    vi.spyOn(fs, 'writeFile').mockImplementation(() => Promise.resolve());
     
     fileSystem.writeFile(mockPath, mockContent);
     expect(fs.writeFile).toHaveBeenCalledWith(mockPath, mockContent);
@@ -49,7 +49,7 @@ describe('FileSystem', () => {
   test('appendFile forwards to fs.appendFile', () => {
     const mockPath = '/test/file.txt';
     const mockContent = 'test content';
-    jest.spyOn(fs, 'appendFile').mockImplementation(() => Promise.resolve());
+    vi.spyOn(fs, 'appendFile').mockImplementation(() => Promise.resolve());
     
     fileSystem.appendFile(mockPath, mockContent);
     expect(fs.appendFile).toHaveBeenCalledWith(mockPath, mockContent);
@@ -57,7 +57,7 @@ describe('FileSystem', () => {
   
   test('readDir forwards to fs.readdir', () => {
     const mockPath = '/test/dir';
-    jest.spyOn(fs, 'readdir').mockImplementation(() => Promise.resolve(['file1.txt', 'file2.txt']));
+    vi.spyOn(fs, 'readdir').mockImplementation(() => Promise.resolve(['file1.txt', 'file2.txt']));
     
     fileSystem.readDir(mockPath);
     expect(fs.readdir).toHaveBeenCalledWith(mockPath);
@@ -65,7 +65,7 @@ describe('FileSystem', () => {
   
   test('stat forwards to fs.stat', () => {
     const mockPath = '/test/file.txt';
-    jest.spyOn(fs, 'stat').mockImplementation(() => Promise.resolve({ isDirectory: () => false }));
+    vi.spyOn(fs, 'stat').mockImplementation(() => Promise.resolve({ isDirectory: () => false }));
     
     fileSystem.stat(mockPath);
     expect(fs.stat).toHaveBeenCalledWith(mockPath);
@@ -73,7 +73,7 @@ describe('FileSystem', () => {
   
   test('remove forwards to fs.remove', () => {
     const mockPath = '/test/file.txt';
-    jest.spyOn(fs, 'remove').mockImplementation(() => Promise.resolve());
+    vi.spyOn(fs, 'remove').mockImplementation(() => Promise.resolve());
     
     fileSystem.remove(mockPath);
     expect(fs.remove).toHaveBeenCalledWith(mockPath);
@@ -81,7 +81,7 @@ describe('FileSystem', () => {
   
   test('joinPath forwards to path.join', () => {
     const mockPaths = ['/test', 'dir', 'file.txt'];
-    jest.spyOn(path, 'join').mockImplementation(() => '/test/dir/file.txt');
+    vi.spyOn(path, 'join').mockImplementation(() => '/test/dir/file.txt');
     
     fileSystem.joinPath(...mockPaths);
     expect(path.join).toHaveBeenCalledWith(...mockPaths);
@@ -89,7 +89,7 @@ describe('FileSystem', () => {
   
   test('basename forwards to path.basename', () => {
     const mockPath = '/test/dir/file.txt';
-    jest.spyOn(path, 'basename').mockImplementation(() => 'file.txt');
+    vi.spyOn(path, 'basename').mockImplementation(() => 'file.txt');
     
     fileSystem.basename(mockPath);
     expect(path.basename).toHaveBeenCalledWith(mockPath);
@@ -97,14 +97,14 @@ describe('FileSystem', () => {
   
   test('dirname forwards to path.dirname', () => {
     const mockPath = '/test/dir/file.txt';
-    jest.spyOn(path, 'dirname').mockImplementation(() => '/test/dir');
+    vi.spyOn(path, 'dirname').mockImplementation(() => '/test/dir');
     
     fileSystem.dirname(mockPath);
     expect(path.dirname).toHaveBeenCalledWith(mockPath);
   });
   
   test('homedir forwards to os.homedir', () => {
-    jest.spyOn(os, 'homedir').mockImplementation(() => '/home/user');
+    vi.spyOn(os, 'homedir').mockImplementation(() => '/home/user');
     
     fileSystem.homedir();
     expect(os.homedir).toHaveBeenCalled();
@@ -112,7 +112,7 @@ describe('FileSystem', () => {
   
   test('ensureDirSync forwards to fs.ensureDirSync', () => {
     const mockPath = '/test/dir';
-    jest.spyOn(fs, 'ensureDirSync').mockImplementation(() => {});
+    vi.spyOn(fs, 'ensureDirSync').mockImplementation(() => {});
     
     fileSystem.ensureDirSync(mockPath);
     expect(fs.ensureDirSync).toHaveBeenCalledWith(mockPath);
@@ -121,7 +121,7 @@ describe('FileSystem', () => {
   test('writeFileSync forwards to fs.writeFileSync', () => {
     const mockPath = '/test/file.txt';
     const mockContent = 'test content';
-    jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
     
     fileSystem.writeFileSync(mockPath, mockContent);
     expect(fs.writeFileSync).toHaveBeenCalledWith(mockPath, mockContent);
@@ -129,7 +129,7 @@ describe('FileSystem', () => {
   
   test('existsSync forwards to fs.existsSync', () => {
     const mockPath = '/test/file.txt';
-    jest.spyOn(fs, 'existsSync').mockImplementation(() => true);
+    vi.spyOn(fs, 'existsSync').mockImplementation(() => true);
     
     fileSystem.existsSync(mockPath);
     expect(fs.existsSync).toHaveBeenCalledWith(mockPath);
@@ -138,7 +138,7 @@ describe('FileSystem', () => {
   test('rename forwards to fs.rename', async () => {
     const oldPath = '/test/oldfile.txt';
     const newPath = '/test/newfile.txt';
-    jest.spyOn(fs, 'rename').mockImplementation(() => Promise.resolve());
+    vi.spyOn(fs, 'rename').mockImplementation(() => Promise.resolve());
     
     await fileSystem.rename(oldPath, newPath);
     expect(fs.rename).toHaveBeenCalledWith(oldPath, newPath);

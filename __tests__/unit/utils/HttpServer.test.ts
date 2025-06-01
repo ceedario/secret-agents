@@ -1,6 +1,6 @@
 import { HttpServer } from '../../../src/utils/HttpServer.js';
 import express from 'express';
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
 describe('HttpServer', () => {
   let httpServer;
@@ -13,27 +13,27 @@ describe('HttpServer', () => {
     
     // Mock express app
     mockApp = {
-      listen: jest.fn(),
-      use: jest.fn()
+      listen: vi.fn(),
+      use: vi.fn()
     };
     
     // Mock server instance
     mockServer = {
-      on: jest.fn(),
-      close: jest.fn()
+      on: vi.fn(),
+      close: vi.fn()
     };
     
     // Mock JSON middleware
-    mockMiddleware = jest.fn();
+    mockMiddleware = vi.fn();
     
     // Mock express and express.json
-    jest.spyOn(express, 'apply').mockReturnValue(mockApp);
-    jest.spyOn(express.json, 'apply').mockReturnValue(mockMiddleware);
+    vi.spyOn(express, 'apply').mockReturnValue(mockApp);
+    vi.spyOn(express.json, 'apply').mockReturnValue(mockMiddleware);
   });
   
   test('createServer creates an Express app', () => {
     // Setup express spy
-    jest.spyOn(express, 'apply').mockReturnValue(mockApp);
+    vi.spyOn(express, 'apply').mockReturnValue(mockApp);
     
     const result = httpServer.createServer();
     

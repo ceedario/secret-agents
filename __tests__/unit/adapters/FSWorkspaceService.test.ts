@@ -2,29 +2,42 @@ import { FSWorkspaceService } from '../../../src/adapters/FSWorkspaceService.js'
 import { WorkspaceService } from '../../../src/services/WorkspaceService.js';
 import fs from 'fs-extra';
 import path from 'path';
-import { jest } from '@jest/globals';
+import { vi, describe, test, expect, beforeEach } from 'vitest';
 
 // Create a mock implementation of the required classes
-jest.mock('fs-extra', () => ({
-  ensureDir: jest.fn().mockResolvedValue(undefined),
-  pathExists: jest.fn().mockResolvedValue(false),
-  existsSync: jest.fn().mockReturnValue(false),
-  readFile: jest.fn().mockResolvedValue(''),
-  writeFile: jest.fn().mockResolvedValue(undefined),
-  remove: jest.fn().mockResolvedValue(undefined),
-}));
+vi.mock('fs-extra', async () => {
+  const mocks = {
+    ensureDir: vi.fn().mockResolvedValue(undefined),
+    pathExists: vi.fn().mockResolvedValue(false),
+    existsSync: vi.fn().mockReturnValue(false),
+    readFile: vi.fn().mockResolvedValue(''),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    remove: vi.fn().mockResolvedValue(undefined),
+  };
+  return {
+    default: mocks,
+    ...mocks
+  };
+});
 
-jest.mock('path', () => ({
-  join: jest.fn((...args) => args.join('/')),
-  dirname: jest.fn(p => p.substring(0, p.lastIndexOf('/'))),
-  basename: jest.fn(p => p.split('/').pop()),
-}));
+vi.mock('path', async () => {
+  return {
+    default: {
+      join: vi.fn((...args) => args.join('/')),
+      dirname: vi.fn(p => p.substring(0, p.lastIndexOf('/'))),
+      basename: vi.fn(p => p.split('/').pop()),
+    },
+    join: vi.fn((...args) => args.join('/')),
+    dirname: vi.fn(p => p.substring(0, p.lastIndexOf('/'))),
+    basename: vi.fn(p => p.split('/').pop()),
+  };
+});
 
 // Mock core classes
-jest.mock('../../../src/utils/FileSystem.js');
-jest.mock('../../../src/utils/ProcessManager.js');
-jest.mock('../../../src/core/Workspace.js', () => ({
-  Workspace: jest.fn().mockImplementation(data => data)
+vi.mock('../../../src/utils/FileSystem.js');
+vi.mock('../../../src/utils/ProcessManager.js');
+vi.mock('../../../src/core/Workspace.js', () => ({
+  Workspace: vi.fn().mockImplementation(data => data)
 }));
 
 describe('FSWorkspaceService', () => {
@@ -38,48 +51,48 @@ describe('FSWorkspaceService', () => {
   
   beforeEach(() => {
     // Reset mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     
     // Create mock implementations
     mockFileSystem = {
-      ensureDir: jest.fn().mockResolvedValue(undefined),
-      pathExists: jest.fn().mockResolvedValue(false),
-      existsSync: jest.fn().mockReturnValue(false),
-      readFile: jest.fn().mockResolvedValue(''),
-      writeFile: jest.fn().mockResolvedValue(undefined),
-      remove: jest.fn().mockResolvedValue(undefined),
-      joinPath: jest.fn((...args) => args.join('/')),
-      dirname: jest.fn(p => p.substring(0, p.lastIndexOf('/'))),
-      basename: jest.fn(p => p.split('/').pop()),
-      homedir: jest.fn(() => './home/testuser'),
-      ensureDirSync: jest.fn(),
+      ensureDir: vi.fn().mockResolvedValue(undefined),
+      pathExists: vi.fn().mockResolvedValue(false),
+      existsSync: vi.fn().mockReturnValue(false),
+      readFile: vi.fn().mockResolvedValue(''),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(undefined),
+      joinPath: vi.fn((...args) => args.join('/')),
+      dirname: vi.fn(p => p.substring(0, p.lastIndexOf('/'))),
+      basename: vi.fn(p => p.split('/').pop()),
+      homedir: vi.fn(() => './home/testuser'),
+      ensureDirSync: vi.fn(),
     };
     
     // Mock ProcessManager with spawn functionality
     mockProcessManager = {
-      spawn: jest.fn().mockReturnValue({
-        stdout: { on: jest.fn() },
-        stderr: { on: jest.fn() },
-        on: jest.fn((event, callback) => {
+      spawn: vi.fn().mockReturnValue({
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn((event, callback) => {
           if (event === 'close') {
             // Auto-resolve with success for simplicity
             setTimeout(() => callback(0), 10);
           }
-          return { stdout: { on: jest.fn() }, stderr: { on: jest.fn() } };
+          return { stdout: { on: vi.fn() }, stderr: { on: vi.fn() } };
         }),
       }),
-      setupProcessHandlers: jest.fn((process, handlers) => {
+      setupProcessHandlers: vi.fn((process, handlers) => {
         // Simulate immediate success by calling the onClose handler
         setTimeout(() => handlers.onClose(0), 10);
       }),
-      wait: jest.fn().mockResolvedValue(undefined),
+      wait: vi.fn().mockResolvedValue(undefined),
     };
     
     // Mock issue
     mockIssue = {
       id: 'test-123',
       identifier: 'TEST-123',
-      getBranchName: jest.fn().mockReturnValue('test-123-branch'),
+      getBranchName: vi.fn().mockReturnValue('test-123-branch'),
     };
     
     // Create service with custom main branch
@@ -91,11 +104,11 @@ describe('FSWorkspaceService', () => {
     );
     
     // Mock internal methods to avoid real implementations
-    workspaceService._getRepoRoot = jest.fn().mockResolvedValue('./test/repo');
-    workspaceService._pullMainBranch = jest.fn().mockResolvedValue(true);
-    workspaceService._createGitWorktree = jest.fn().mockResolvedValue(true);
-    workspaceService._verifyBranchAndRunSetup = jest.fn().mockResolvedValue(undefined);
-    workspaceService._getHistoryFilePath = jest.fn().mockReturnValue('./home/testuser/.linearsecretagent/test-123-branch/conversation-history.jsonl');
+    workspaceService._getRepoRoot = vi.fn().mockResolvedValue('./test/repo');
+    workspaceService._pullMainBranch = vi.fn().mockResolvedValue(true);
+    workspaceService._createGitWorktree = vi.fn().mockResolvedValue(true);
+    workspaceService._verifyBranchAndRunSetup = vi.fn().mockResolvedValue(undefined);
+    workspaceService._getHistoryFilePath = vi.fn().mockReturnValue('./home/testuser/.linearsecretagent/test-123-branch/conversation-history.jsonl');
   });
   
   test('constructor should store the main branch name', () => {
@@ -122,11 +135,11 @@ describe('FSWorkspaceService', () => {
   test('createWorkspace should pass mainBranch to _createGitWorktree', async () => {
     // Test with default main branch
     const defaultService = new FSWorkspaceService(testBaseDir, mockFileSystem, mockProcessManager);
-    defaultService._getRepoRoot = jest.fn().mockResolvedValue('./test/repo');
-    defaultService._pullMainBranch = jest.fn().mockResolvedValue(true);
-    defaultService._createGitWorktree = jest.fn().mockResolvedValue(true);
-    defaultService._verifyBranchAndRunSetup = jest.fn().mockResolvedValue(undefined);
-    defaultService._getHistoryFilePath = jest.fn().mockReturnValue('./home/testuser/.linearsecretagent/test-123-branch/conversation-history.jsonl');
+    defaultService._getRepoRoot = vi.fn().mockResolvedValue('./test/repo');
+    defaultService._pullMainBranch = vi.fn().mockResolvedValue(true);
+    defaultService._createGitWorktree = vi.fn().mockResolvedValue(true);
+    defaultService._verifyBranchAndRunSetup = vi.fn().mockResolvedValue(undefined);
+    defaultService._getHistoryFilePath = vi.fn().mockReturnValue('./home/testuser/.linearsecretagent/test-123-branch/conversation-history.jsonl');
     
     await defaultService.createWorkspace(mockIssue);
     
@@ -139,11 +152,11 @@ describe('FSWorkspaceService', () => {
     
     // Test with custom main branch
     const customService = new FSWorkspaceService(testBaseDir, mockFileSystem, mockProcessManager, 'master');
-    customService._getRepoRoot = jest.fn().mockResolvedValue('./test/repo');
-    customService._pullMainBranch = jest.fn().mockResolvedValue(true);
-    customService._createGitWorktree = jest.fn().mockResolvedValue(true);
-    customService._verifyBranchAndRunSetup = jest.fn().mockResolvedValue(undefined);
-    customService._getHistoryFilePath = jest.fn().mockReturnValue('./home/testuser/.linearsecretagent/test-123-branch/conversation-history.jsonl');
+    customService._getRepoRoot = vi.fn().mockResolvedValue('./test/repo');
+    customService._pullMainBranch = vi.fn().mockResolvedValue(true);
+    customService._createGitWorktree = vi.fn().mockResolvedValue(true);
+    customService._verifyBranchAndRunSetup = vi.fn().mockResolvedValue(undefined);
+    customService._getHistoryFilePath = vi.fn().mockReturnValue('./home/testuser/.linearsecretagent/test-123-branch/conversation-history.jsonl');
     
     await customService.createWorkspace(mockIssue);
     

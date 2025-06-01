@@ -11,11 +11,15 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
-    "test": "jest",
-    "test:watch": "jest --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit",
     "oauth:server": "ts-node scripts/start-auth-server.ts",
     "oauth:reset": "ts-node scripts/reset-oauth.ts"
   },
+  "packageManager": "pnpm@10.11.0",
   "keywords": [
     "linear",
     "claude",
@@ -47,14 +51,12 @@
   "devDependencies": {
     "@types/express": "^5.0.2",
     "@types/fs-extra": "^11.0.4",
-    "@types/jest": "^29.5.14",
     "@types/node": "^22.15.29",
     "@types/node-fetch": "^2.6.12",
-    "jest": "^29.7.0",
-    "jest-environment-node": "^29.7.0",
+    "@vitest/ui": "^3.1.4",
     "nodemon": "^2.0.22",
-    "ts-jest": "^29.3.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.4"
   }
 }

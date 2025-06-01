@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/Built%20by-Ceedar.ai-b8ec83?style=for-the-badge&logoColor=black&labelColor=333333" alt="Built by Ceedar.ai">
   </a>
   <a href="https://github.com/ceedario/secret-agents/actions">
-    <img src="https://github.com/ceedario/secret-agents/actions/workflows/tests.yml/badge.svg" alt="Tests">
+    <img src="https://github.com/ceedario/secret-agents/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
 </p>
 
@@ -100,8 +100,8 @@ This approach ensures continuous context while being efficient with token usage.
 1. Clone this repository
 2. Create a `.env.secret-agents` file based on `.env.example`
 3. Fill in your Linear API token, user ID, and webhook secret
-4. Install dependencies with `npm install`
-5. Optional: Install globally with `npm install -g .` (allows running `linear-claude-agent` from any directory)
+4. Install dependencies with `pnpm install`
+5. Optional: Install globally with `pnpm install -g .` (allows running `linear-claude-agent` from any directory)
 6. Start the agent with `npm start` or `linear-claude-agent` if installed globally
 
 ## Environment Variables
@@ -178,7 +178,7 @@ When creating your application in the Linear dashboard, you'll also configure we
 
 **Important**: Linear webhooks require a public URL and cannot connect to localhost directly. For development, you can use [ngrok](https://ngrok.com/) to create a secure tunnel:
 
-1. Install ngrok: `npm install -g ngrok` or download from [ngrok.com](https://ngrok.com/download)
+1. Install ngrok: `pnpm install -g ngrok` or download from [ngrok.com](https://ngrok.com/download)
 2. Start your agent on your local port (e.g., port 3000)
 3. In a separate terminal, start ngrok: `ngrok http 3000`
 4. Copy the HTTPS URL provided by ngrok (e.g., `https://abc123.ngrok.io`)
@@ -210,7 +210,7 @@ There are several ways to run the agent:
 
 2. **Development Mode** (auto-restart on file changes):
    ```
-   npm run dev
+   pnpm run dev
    ```
 
 3. **OAuth Authorization** (first time setup):

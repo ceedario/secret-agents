@@ -885,7 +885,7 @@ CLAUDE_INPUT_EOF`;
           allowedTools = claudeConfig.availableTools;
         }
         
-        // Create a shell script to properly handle the continuation
+        // Create the arguments for Claude continuation
         const claudeArgs = claudeConfig.getContinueArgs(allowedTools, workspace.path);
         
         // Log the arguments for debugging

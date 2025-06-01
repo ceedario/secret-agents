@@ -61,7 +61,7 @@ The project follows a layered architecture with clear separation of concerns:
 1. Check current branch status: `git diff main...HEAD`
 2. Check for existing PRs: `gh pr list --head <branch-name>`
 3. Make changes following code conventions
-4. Run tests: `npm test`
+4. Run tests: `pnpm test`
 5. Update CHANGELOG.md with your changes
 6. Commit with descriptive messages
 7. Create PR with adequate description
@@ -108,9 +108,9 @@ Key environment variables to be aware of:
 
 ## Testing Commands
 
-- Run all tests: `npm test`
-- Run specific test: `npm test -- path/to/test.mjs`
-- Development mode: `npm run dev`
+- Run all tests: `pnpm test`
+- Run specific test: `pnpm test -- path/to/test.mjs`
+- Development mode: `pnpm run dev`
 
 ## Debugging
 

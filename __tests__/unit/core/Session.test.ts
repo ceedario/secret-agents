@@ -1,6 +1,7 @@
 import { Session } from '../../../src/core/Session.js';
 import { Issue } from '../../../src/core/Issue.js';
 import { Workspace } from '../../../src/core/Workspace.js';
+import { describe, it, expect } from 'vitest';
 
 describe('Session', () => {
   // Create mock issue and workspace

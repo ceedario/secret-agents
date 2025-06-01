@@ -39,9 +39,9 @@ We use GitHub issues to track work. Here's how to do that effectively:
 
 1. Clone the repository
 2. Create a `.env` file based on `.env.example`
-3. Install dependencies with `npm install`
-4. Run the tests with `npm test`
-5. Start the development server with `npm run dev`
+3. Install dependencies with `pnpm install`
+4. Run the tests with `pnpm test`
+5. Start the development server with `pnpm run dev`
 
 ## Testing
 

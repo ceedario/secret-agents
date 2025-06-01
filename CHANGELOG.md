@@ -10,9 +10,14 @@ All notable changes to this project will be documented in this file.
   - Added comprehensive type definitions for all classes and interfaces
   - Configured TypeScript with strict mode for better type safety
   - Added build script to compile TypeScript to JavaScript
-  - Added TypeScript dependencies: typescript, ts-node, ts-jest, and type definitions
+  - Added TypeScript dependencies: typescript, ts-node, and type definitions
   - Created tsconfig.json with provided strict configuration
   - dist/ folder added to .gitignore for TypeScript build output
+- Vitest as the new test runner, replacing Jest
+  - Provides significantly faster test execution
+  - Maintains full compatibility with existing test APIs
+  - Includes built-in UI mode for test debugging with `pnpm run test:ui`
+  - Native ES modules support without experimental flags
 - Coverage folder to .gitignore to prevent test coverage reports from being tracked
 - AttachmentDownloader class to handle all types of Linear attachments (not just images)
   - Supports downloading any file type from Linear's authenticated storage
@@ -27,16 +32,25 @@ All notable changes to this project will be documented in this file.
 - Added TypeScript compilation step before running the application
 - Dev script now uses ts-node to run TypeScript directly without compilation
 - All test files migrated from .mjs to .ts
-- Jest configuration updated to use ts-jest for TypeScript test support
+- Test configuration to use vitest with TypeScript support
 - Updated all imports to use .js extensions as per TypeScript ES module standards
-
-### Removed
-- Coverage folder from git tracking (now properly ignored)
-- ImageDownloader class (replaced by AttachmentDownloader)
-  - All image handling functionality is now provided by AttachmentDownloader
-  - Removed ImageDownloader tests, exports, and container registration
-
-### Changed
+- Migrated from npm to pnpm package manager
+  - Replaced package-lock.json with pnpm-lock.yaml
+  - Updated all documentation to use pnpm commands
+  - Updated GitHub Actions workflow to use pnpm
+  - Added `packageManager` field to package.json for explicit pnpm version (10.11.0)
+- Renamed and simplified GitHub Actions workflow
+  - Renamed `tests.yml` to `ci.yml` to better reflect its purpose
+  - Simplified workflow configuration for clarity
+  - Updated badge reference in README.md
+  - Switched to `wyvox/action-setup-pnpm` for consistent dependency installation
+  - Added Node.js 22.x to the test matrix
+  - Refactored dependency installation into a reusable GitHub Action
+- Test runner from Jest to Vitest for improved performance
+  - All test files updated to import from 'vitest' instead of '@jest/globals'
+  - Mock functions migrated from `jest.*` to `vi.*` equivalents
+  - Updated package.json test scripts to use vitest commands
+  - Created vitest.config.mjs with minimal configuration using defaults
 - CLI argument `--env-file`/`-e` to specify custom environment file
 - Default environment file changed from `.env` to `.env.secret-agents`
 - CLAUDE.md file with project conventions and guidelines for Claude Code assistant
@@ -66,7 +80,24 @@ All notable changes to this project will be documented in this file.
   - No longer relies on URL extensions which Linear doesn't provide
   - Falls back to .png if file type cannot be determined
 
+### Removed
+- Jest test runner and related dependencies (@types/jest, jest-environment-node)
+- Jest configuration file (jest.config.mjs) 
+- Coverage folder from git tracking (now properly ignored)
+- ImageDownloader class (replaced by AttachmentDownloader)
+  - All image handling functionality is now provided by AttachmentDownloader
+  - Removed ImageDownloader tests, exports, and container registration
+- Experimental Node.js flags from test scripts
+
 ### Fixed
+- TypeScript compilation errors in source files
+  - Fixed import statements for Node.js built-in modules (crypto, os, path)
+  - Added proper type annotations for parseArgs options
+  - Fixed unused variable warnings (tokenInfo in ExpressWebhookService)
+  - Removed unused imports (ChildProcessWithoutNullStreams, path)
+  - Fixed error handling with proper type assertions
+  - Updated tsconfig.json with ES2022 module and target for top-level await support
+  - Added allowSyntheticDefaultImports for better module compatibility
 - Agent now correctly identifies itself using its Linear username instead of "Claude"
   - Prompt template now uses dynamic `{{agent_name}}` placeholder
   - Agent name is fetched from Linear API and injected into prompts

@@ -1,4 +1,5 @@
 import { Issue } from '../../../src/core/Issue.js';
+import { describe, it, expect } from 'vitest';
 
 describe('Issue', () => {
   const mockIssueData = {

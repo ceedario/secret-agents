@@ -1,5 +1,5 @@
 import { ExpressWebhookService } from '../../../src/adapters/ExpressWebhookService.js';
-import { jest } from '@jest/globals';
+import { vi, describe, beforeEach, it, expect } from 'vitest';
 
 describe('ExpressWebhookService', () => {
   let webhookService;
@@ -23,16 +23,16 @@ describe('ExpressWebhookService', () => {
     };
     
     // Track calls to the handler methods
-    mockIssueService.handleAgentMention = jest.fn(mockIssueService.handleAgentMention);
-    mockIssueService.handleAgentAssignment = jest.fn(mockIssueService.handleAgentAssignment);
-    mockIssueService.handleAgentReply = jest.fn(mockIssueService.handleAgentReply);
-    mockIssueService.handleCommentEvent = jest.fn(mockIssueService.handleCommentEvent);
+    mockIssueService.handleAgentMention = vi.fn(mockIssueService.handleAgentMention);
+    mockIssueService.handleAgentAssignment = vi.fn(mockIssueService.handleAgentAssignment);
+    mockIssueService.handleAgentReply = vi.fn(mockIssueService.handleAgentReply);
+    mockIssueService.handleCommentEvent = vi.fn(mockIssueService.handleCommentEvent);
 
     mockHttpServer = {
-      createServer: jest.fn().mockReturnValue({}),
-      jsonParser: jest.fn().mockReturnValue([]),
-      listen: jest.fn().mockResolvedValue({}),
-      close: jest.fn().mockResolvedValue({}),
+      createServer: vi.fn().mockReturnValue({}),
+      jsonParser: vi.fn().mockReturnValue([]),
+      listen: vi.fn().mockResolvedValue({}),
+      close: vi.fn().mockResolvedValue({}),
     };
 
     mockOAuthHelper = {};

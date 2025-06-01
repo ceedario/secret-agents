@@ -1,13 +1,13 @@
-import { jest } from '@jest/globals'
+import { vi } from 'vitest'
 
 // Mock node-fetch before importing AttachmentDownloader
-jest.unstable_mockModule('node-fetch', () => ({
-  default: jest.fn()
+vi.mock('node-fetch', () => ({
+  default: vi.fn()
 }))
 
 // Mock file-type module
-jest.unstable_mockModule('file-type', () => ({
-  fileTypeFromBuffer: jest.fn()
+vi.mock('file-type', () => ({
+  fileTypeFromBuffer: vi.fn()
 }))
 
 // Import modules after mocking
@@ -24,28 +24,28 @@ describe('AttachmentDownloader', () => {
 
   beforeEach(() => {
     // Reset mocks
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     fetch.mockClear()
     fileTypeFromBuffer.mockClear()
 
     // Create mock dependencies
     mockLinearClient = {
-      viewer: jest.fn().mockResolvedValue({ id: 'user-123', name: 'Test User' })
+      viewer: vi.fn().mockResolvedValue({ id: 'user-123', name: 'Test User' })
     }
 
     mockFileSystem = {
-      ensureDir: jest.fn().mockResolvedValue(undefined),
-      existsSync: jest.fn().mockReturnValue(false),
-      writeFile: jest.fn().mockResolvedValue(undefined),
-      homedir: jest.fn().mockReturnValue('/home/user'),
-      basename: jest.fn().mockReturnValue('workspace'),
-      joinPath: jest.fn().mockImplementation((...args) => args.join('/')),
-      rename: jest.fn().mockResolvedValue(undefined)
+      ensureDir: vi.fn().mockResolvedValue(undefined),
+      existsSync: vi.fn().mockReturnValue(false),
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      homedir: vi.fn().mockReturnValue('/home/user'),
+      basename: vi.fn().mockReturnValue('workspace'),
+      joinPath: vi.fn().mockImplementation((...args) => args.join('/')),
+      rename: vi.fn().mockResolvedValue(undefined)
     }
 
     mockOAuthHelper = {
-      hasValidToken: jest.fn().mockResolvedValue(true),
-      getAccessToken: jest.fn().mockResolvedValue('oauth-token-123')
+      hasValidToken: vi.fn().mockResolvedValue(true),
+      getAccessToken: vi.fn().mockResolvedValue('oauth-token-123')
     }
 
     attachmentDownloader = new AttachmentDownloader(mockLinearClient, mockFileSystem, mockOAuthHelper)
@@ -103,7 +103,7 @@ describe('AttachmentDownloader', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        buffer: jest.fn().mockResolvedValue(mockBuffer)
+        buffer: vi.fn().mockResolvedValue(mockBuffer)
       })
       
       // Mock file type detection for image
@@ -133,7 +133,7 @@ describe('AttachmentDownloader', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        buffer: jest.fn().mockResolvedValue(mockBuffer)
+        buffer: vi.fn().mockResolvedValue(mockBuffer)
       })
       
       // Mock file type detection returning null (unknown type)
@@ -154,7 +154,7 @@ describe('AttachmentDownloader', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        buffer: jest.fn().mockResolvedValue(mockBuffer)
+        buffer: vi.fn().mockResolvedValue(mockBuffer)
       })
       
       // Mock file type detection for PDF
@@ -177,7 +177,7 @@ describe('AttachmentDownloader', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        buffer: jest.fn().mockResolvedValue(mockBuffer)
+        buffer: vi.fn().mockResolvedValue(mockBuffer)
       })
       
       fileTypeFromBuffer.mockResolvedValueOnce(null)
@@ -253,15 +253,15 @@ describe('AttachmentDownloader', () => {
       fetch
         .mockResolvedValueOnce({
           ok: true,
-          buffer: jest.fn().mockResolvedValue(mockImageBuffer)
+          buffer: vi.fn().mockResolvedValue(mockImageBuffer)
         })
         .mockResolvedValueOnce({
           ok: true,
-          buffer: jest.fn().mockResolvedValue(mockJsonlBuffer)
+          buffer: vi.fn().mockResolvedValue(mockJsonlBuffer)
         })
         .mockResolvedValueOnce({
           ok: true,
-          buffer: jest.fn().mockResolvedValue(mockPdfBuffer)
+          buffer: vi.fn().mockResolvedValue(mockPdfBuffer)
         })
 
       fileTypeFromBuffer
@@ -297,7 +297,7 @@ describe('AttachmentDownloader', () => {
       fetch
         .mockResolvedValueOnce({
           ok: true,
-          buffer: jest.fn().mockResolvedValue(Buffer.from('data'))
+          buffer: vi.fn().mockResolvedValue(Buffer.from('data'))
         })
         .mockResolvedValueOnce({
           ok: false,
@@ -330,7 +330,7 @@ describe('AttachmentDownloader', () => {
       const mockBuffer = Buffer.from('data')
       fetch.mockResolvedValue({
         ok: true,
-        buffer: jest.fn().mockResolvedValue(mockBuffer)
+        buffer: vi.fn().mockResolvedValue(mockBuffer)
       })
       fileTypeFromBuffer.mockResolvedValue({ ext: 'pdf', mime: 'application/pdf' })
 

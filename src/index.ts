@@ -1,21 +1,21 @@
 #!/usr/bin/env node
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 import { parseArgs, ParseArgsConfig } from 'node:util';
 
 // Parse command line arguments first to get env file path
 const options: ParseArgsConfig['options'] = {
   'env-file': {
-    type: 'string',
+    type: 'string' as const,
     short: 'e',
     default: '.env.secret-agents'
   },
   help: {
-    type: 'boolean',
+    type: 'boolean' as const,
     short: 'h'
   }
 };
 
-let values: { 'env-file'?: string; help?: boolean };
+let values: any;
 try {
   const parsed = parseArgs({ options, allowPositionals: false });
   values = parsed.values;
