@@ -6,10 +6,9 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "lib": ["ESNext"],
-    "module": "ES2022",
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "noEmitOnError": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmitOnError": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": true,
     "noImplicitOverride": true,
@@ -17,23 +16,14 @@
     "noImplicitThis": true,
     "noUncheckedSideEffectImports": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": false,
+    "noUnusedParameters": true,
     "outDir": "./dist",
     "pretty": true,
-    "rootDir": "./",
+    "rootDir": "./src",
     "strict": true,
     "strictFunctionTypes": true,
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
-    "target": "ES2022"
-  },
-  "include": [
-    "src/**/*",
-    "__tests__/**/*",
-    "scripts/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+    "target": "ESNext"
+  }
 }

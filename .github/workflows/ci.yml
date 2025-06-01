@@ -35,7 +35,14 @@ jobs:
         ANTHROPIC_API_KEY=test
         EOF
     
-    - run: pnpm test
+    - name: Build TypeScript
+      run: pnpm run build
+    
+    - name: Type check
+      run: pnpm run lint
+    
+    - name: Run tests
+      run: pnpm test
     
     - name: Upload coverage
       uses: codecov/codecov-action@v3

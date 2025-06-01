@@ -2,7 +2,7 @@ import { App } from '../../src/app.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
 
 // Mock the dotenv config
-vi.mock('dotenv/config', () => {});
+vi.mock('dotenv/config', () => ({}));
 
 // Mock the env config to avoid validation errors
 vi.mock('../../src/config/env.js', () => {
@@ -46,7 +46,7 @@ vi.mock('../../src/container.js', async () => {
   
   const mockWorkspaceService = {
     setupBaseDir: vi.fn().mockResolvedValue('/mock/workspace'),
-    cleanupAllWorkspaces: vi.fn().mockResolvedValue()
+    cleanupAllWorkspaces: vi.fn().mockResolvedValue(undefined)
   };
   
   // Import the mocked config using dynamic import
@@ -93,7 +93,7 @@ describe('App', () => {
       await app.start();
       
       // Verify the correct steps were called
-      const container = app.container;
+      const container = (app as any).container;
       expect(container.get).toHaveBeenCalledWith('config');
       expect(container.get('config').validate).toHaveBeenCalled();
       
@@ -122,14 +122,14 @@ describe('App', () => {
       });
       
       // Replace the validate method
-      const originalValidate = app.container.get('config').validate;
-      app.container.get('config').validate = mockValidateFn;
+      const originalValidate = (app as any).container.get('config').validate;
+      (app as any).container.get('config').validate = mockValidateFn;
       
       // Spy on console.error
       const consoleErrorSpy = vi.spyOn(console, 'error');
       
       // Mock shutdown method
-      app.shutdown = vi.fn().mockResolvedValue();
+      app.shutdown = vi.fn().mockResolvedValue(undefined);
       
       // Start the app and expect it to throw
       await expect(app.start()).rejects.toThrow('Configuration validation error');
@@ -144,7 +144,7 @@ describe('App', () => {
       expect(app.shutdown).toHaveBeenCalled();
       
       // Restore original method
-      app.container.get('config').validate = originalValidate;
+      (app as any).container.get('config').validate = originalValidate;
     });
   });
   
@@ -154,7 +154,7 @@ describe('App', () => {
       const app = new App();
       
       // Set up webhook server
-      app.webhookServer = { close: vi.fn() };
+      (app as any).webhookServer = { close: vi.fn() };
       
       // Spy on console.log
       const consoleLogSpy = vi.spyOn(console, 'log');
@@ -163,7 +163,7 @@ describe('App', () => {
       await app.shutdown();
       
       // Verify webhook server was closed
-      expect(app.webhookServer.close).toHaveBeenCalled();
+      expect((app as any).webhookServer.close).toHaveBeenCalled();
       
       // Verify shutdown message was logged
       expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -171,7 +171,7 @@ describe('App', () => {
       );
       
       // Verify isShuttingDown flag was set
-      expect(app.isShuttingDown).toBe(true);
+      expect((app as any).isShuttingDown).toBe(true);
     });
     
     it('should prevent multiple shutdowns', async () => {
@@ -179,16 +179,16 @@ describe('App', () => {
       const app = new App();
       
       // Set up webhook server
-      app.webhookServer = { close: vi.fn() };
+      (app as any).webhookServer = { close: vi.fn() };
       
       // Set isShuttingDown flag
-      app.isShuttingDown = true;
+      (app as any).isShuttingDown = true;
       
       // Shut down the app
       await app.shutdown();
       
       // Verify webhook server was not closed again
-      expect(app.webhookServer.close).not.toHaveBeenCalled();
+      expect((app as any).webhookServer.close).not.toHaveBeenCalled();
     });
   });
 });

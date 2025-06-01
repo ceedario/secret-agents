@@ -28,7 +28,7 @@ export class IssueService {
    * @param issueId - The ID of the issue to fetch
    * @returns The requested issue
    */
-  async fetchIssue(issueId: string): Promise<Issue> {
+  async fetchIssue(_issueId: string): Promise<Issue> {
     throw new Error('Not implemented')
   }
   
@@ -38,7 +38,7 @@ export class IssueService {
    * @param body - The body of the comment
    * @returns Success status
    */
-  async createComment(issueId: string, body: string): Promise<boolean> {
+  async createComment(_issueId: string, _body: string): Promise<boolean> {
     throw new Error('Not implemented')
   }
   
@@ -46,7 +46,7 @@ export class IssueService {
    * Handle an issue creation event
    * @param issueData - Raw issue data from webhook
    */
-  async handleIssueCreateEvent(issueData: any): Promise<void> {
+  async handleIssueCreateEvent(_issueData: any): Promise<void> {
     throw new Error('Not implemented')
   }
   
@@ -54,7 +54,7 @@ export class IssueService {
    * Handle an issue update event
    * @param issueData - Raw issue data from webhook
    */
-  async handleIssueUpdateEvent(issueData: any): Promise<void> {
+  async handleIssueUpdateEvent(_issueData: any): Promise<void> {
     throw new Error('Not implemented')
   }
   
@@ -62,7 +62,7 @@ export class IssueService {
    * Handle a comment event
    * @param commentData - Raw comment data from webhook
    */
-  async handleCommentEvent(commentData: any): Promise<void> {
+  async handleCommentEvent(_commentData: any): Promise<void> {
     throw new Error('Not implemented')
   }
   
@@ -70,7 +70,7 @@ export class IssueService {
    * Handle when the agent is mentioned in a comment (Agent API)
    * @param data - The mention notification data
    */
-  async handleAgentMention(data: any): Promise<void> {
+  async handleAgentMention(_data: any): Promise<void> {
     throw new Error('Not implemented')
   }
   
@@ -78,7 +78,7 @@ export class IssueService {
    * Handle when the agent is assigned to an issue (Agent API)
    * @param data - The assignment notification data
    */
-  async handleAgentAssignment(data: any): Promise<void> {
+  async handleAgentAssignment(_data: any): Promise<void> {
     throw new Error('Not implemented')
   }
   
@@ -86,7 +86,7 @@ export class IssueService {
    * Handle when someone replies to the agent's comment (Agent API)
    * @param data - The reply notification data
    */
-  async handleAgentReply(data: any): Promise<void> {
+  async handleAgentReply(_data: any): Promise<void> {
     throw new Error('Not implemented')
   }
   
@@ -94,7 +94,7 @@ export class IssueService {
    * Handle when the agent is unassigned from an issue
    * @param data - The unassignment notification data
    */
-  async handleAgentUnassignment(data: any): Promise<void> {
+  async handleAgentUnassignment(_data: any): Promise<void> {
     throw new Error('Not implemented')
   }
 }

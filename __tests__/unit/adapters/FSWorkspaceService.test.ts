@@ -4,6 +4,9 @@ import fs from 'fs-extra';
 import path from 'path';
 import { vi, describe, test, expect, beforeEach } from 'vitest';
 
+// Type definitions for mocks
+type MockFn = ReturnType<typeof vi.fn>;
+
 // Create a mock implementation of the required classes
 vi.mock('fs-extra', async () => {
   const mocks = {
@@ -23,13 +26,13 @@ vi.mock('fs-extra', async () => {
 vi.mock('path', async () => {
   return {
     default: {
-      join: vi.fn((...args) => args.join('/')),
-      dirname: vi.fn(p => p.substring(0, p.lastIndexOf('/'))),
-      basename: vi.fn(p => p.split('/').pop()),
+      join: vi.fn((...args: string[]) => args.join('/')),
+      dirname: vi.fn((p: string) => p.substring(0, p.lastIndexOf('/'))),
+      basename: vi.fn((p: string) => p.split('/').pop()),
     },
-    join: vi.fn((...args) => args.join('/')),
-    dirname: vi.fn(p => p.substring(0, p.lastIndexOf('/'))),
-    basename: vi.fn(p => p.split('/').pop()),
+    join: vi.fn((...args: string[]) => args.join('/')),
+    dirname: vi.fn((p: string) => p.substring(0, p.lastIndexOf('/'))),
+    basename: vi.fn((p: string) => p.split('/').pop()),
   };
 });
 
@@ -41,10 +44,10 @@ vi.mock('../../../src/core/Workspace.js', () => ({
 }));
 
 describe('FSWorkspaceService', () => {
-  let workspaceService;
-  let mockFileSystem;
-  let mockProcessManager;
-  let mockIssue;
+  let workspaceService: FSWorkspaceService;
+  let mockFileSystem: any;
+  let mockProcessManager: any;
+  let mockIssue: any;
   
   const testBaseDir = './test/workspaces';
   const customMainBranch = 'develop';

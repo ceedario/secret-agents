@@ -12,7 +12,7 @@ export class ClaudeService {
    * @param workspace - The workspace for the issue
    * @returns The created session
    */
-  async startSession(issue: Issue, workspace: Workspace): Promise<Session> {
+  async startSession(_issue: Issue, _workspace: Workspace): Promise<Session> {
     throw new Error('Not implemented')
   }
   
@@ -22,7 +22,7 @@ export class ClaudeService {
    * @param commentText - The comment text to send
    * @returns The updated session
    */
-  async sendComment(session: Session, commentText: string): Promise<Session> {
+  async sendComment(_session: Session, _commentText: string): Promise<Session> {
     throw new Error('Not implemented')
   }
   
@@ -34,7 +34,7 @@ export class ClaudeService {
    * @param durationMs - Optional duration information
    * @returns Success status
    */
-  async postResponseToLinear(issueId: string, response: string, costUsd: number | null = null, durationMs: number | null = null): Promise<boolean> {
+  async postResponseToLinear(_issueId: string, _response: string, _costUsd: number | null = null, _durationMs: number | null = null): Promise<boolean> {
     throw new Error('Not implemented')
   }
   
@@ -44,7 +44,7 @@ export class ClaudeService {
    * @param tokenLimitResumeContext - Whether this is a resume after token limit
    * @returns The formatted prompt
    */
-  async buildInitialPrompt(issue: Issue, tokenLimitResumeContext: boolean = false): Promise<string> {
+  async buildInitialPrompt(_issue: Issue, _tokenLimitResumeContext: boolean = false): Promise<string> {
     throw new Error('Not implemented')
   }
 }

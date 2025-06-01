@@ -973,7 +973,7 @@ CLAUDE_INPUT_EOF`;
    * @param jsonResponse - The cost response from Claude
    * @private
    */
-  async _calculateAndPostCost(issue: Issue, historyPath: string, jsonResponse: ClaudeJsonResponse): Promise<void> {
+  async _calculateAndPostCost(_issue: Issue, _historyPath: string, jsonResponse: ClaudeJsonResponse): Promise<void> {
     // Temporarily disabled cost posting
     /*
     try {
@@ -1034,7 +1034,7 @@ CLAUDE_INPUT_EOF`;
   /**
    * @inheritdoc
    */
-  override async postResponseToLinear(issueId: string, response: string, costUsd: number | null = null, durationMs: number | null = null): Promise<boolean> {
+  override async postResponseToLinear(issueId: string, response: string, _costUsd: number | null = null, _durationMs: number | null = null): Promise<boolean> {
     try {
       // Calculate response length and truncate preview to reduce verbosity
       const responseLength = response.length;
@@ -1055,9 +1055,9 @@ CLAUDE_INPUT_EOF`;
       let formattedResponse = response;
       
       // Append cost information if provided
-      if (costUsd !== null && durationMs !== null) {
+      if (_costUsd !== null && _durationMs !== null) {
         formattedResponse += `\n\n---`;
-        formattedResponse += `\n*Last run cost: $${costUsd.toFixed(2)}, Duration: ${durationMs / 1000}s*`;
+        formattedResponse += `\n*Last run cost: $${_costUsd.toFixed(2)}, Duration: ${_durationMs / 1000}s*`;
       }
       
       // Create a comment on the issue

@@ -1,7 +1,61 @@
+import { describe, it, expect } from 'vitest';
+
+interface MockIssue {
+  id: string;
+  identifier?: string;
+  title?: string;
+  description?: string;
+  state?: {
+    type?: string;
+    name?: string;
+  };
+  _assignee?: {
+    id: string;
+    name?: string;
+  };
+  assignee?: {
+    id: string;
+    name?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface MockComment {
+  id: string;
+  issueId: string;
+  body: string;
+  createdAt: string;
+  userId?: string;
+}
+
+interface IssueQueryParams {
+  filter?: {
+    assignee?: {
+      id?: {
+        eq?: string;
+      };
+    };
+    state?: {
+      type?: {
+        nin?: string[];
+      };
+    };
+  };
+}
+
+interface CommentCreateParams {
+  issueId: string;
+  body: string;
+}
+
 /**
  * Mock Linear client for testing
  */
 export class MockLinearClient {
+  issues: MockIssue[];
+  comments: MockComment[];
+
   constructor() {
     this.issues = [];
     this.comments = [];
@@ -9,26 +63,26 @@ export class MockLinearClient {
   
   /**
    * Set mock issues for testing
-   * @param {Array} issues - Array of mock issues
+   * @param issues - Array of mock issues
    */
-  setIssues(issues) {
+  setIssues(issues: MockIssue[]): void {
     this.issues = issues;
   }
   
   /**
    * Set mock comments for testing
-   * @param {Array} comments - Array of mock comments
+   * @param comments - Array of mock comments
    */
-  setComments(comments) {
+  setComments(comments: MockComment[]): void {
     this.comments = comments;
   }
   
   /**
    * Mock issues query
-   * @param {Object} params - Query parameters
-   * @returns {Promise<Object>} - Mock issue results
+   * @param params - Query parameters
+   * @returns Mock issue results
    */
-  async issues(params) {
+  async issues(params?: IssueQueryParams): Promise<{ nodes: MockIssue[] }> {
     // Filter issues based on params if needed
     let filteredIssues = [...this.issues];
     
@@ -39,7 +93,9 @@ export class MockLinearClient {
     
     if (params?.filter?.state?.type?.nin) {
       const excludedTypes = params.filter.state.type.nin;
-      filteredIssues = filteredIssues.filter(issue => !excludedTypes.includes(issue.state?.type));
+      filteredIssues = filteredIssues.filter(issue => 
+        issue.state?.type ? !excludedTypes.includes(issue.state.type) : true
+      );
     }
     
     return {
@@ -49,10 +105,10 @@ export class MockLinearClient {
   
   /**
    * Mock issue query
-   * @param {string} issueId - Issue ID
-   * @returns {Promise<Object>} - Mock issue
+   * @param issueId - Issue ID
+   * @returns Mock issue
    */
-  async issue(issueId) {
+  async issue(issueId: string): Promise<MockIssue> {
     const issue = this.issues.find(issue => issue.id === issueId);
     
     if (!issue) {
@@ -64,11 +120,11 @@ export class MockLinearClient {
   
   /**
    * Mock comment creation
-   * @param {Object} params - Comment parameters
-   * @returns {Promise<Object>} - Created comment
+   * @param params - Comment parameters
+   * @returns Created comment
    */
-  async createComment(params) {
-    const comment = {
+  async createComment(params: CommentCreateParams): Promise<MockComment> {
+    const comment: MockComment = {
       id: `comment-${Date.now()}`,
       issueId: params.issueId,
       body: params.body,

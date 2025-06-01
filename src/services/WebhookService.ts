@@ -10,7 +10,7 @@ export class WebhookService {
    * @param port - The port to listen on
    * @returns The server instance
    */
-  async startServer(port: number): Promise<Server> {
+  async startServer(_port: number): Promise<Server> {
     throw new Error('Not implemented')
   }
   
@@ -19,7 +19,7 @@ export class WebhookService {
    * @param req - The express request object
    * @returns Whether the signature is valid
    */
-  verifySignature(req: Request): boolean {
+  verifySignature(_req: Request): boolean {
     throw new Error('Not implemented')
   }
   
@@ -29,7 +29,7 @@ export class WebhookService {
    * @param action - The event action
    * @param data - The event data
    */
-  async processEvent(type: string, action: string, data: any): Promise<void> {
+  async processEvent(_type: string, _action: string, _data: any): Promise<void> {
     throw new Error('Not implemented')
   }
   
@@ -38,7 +38,7 @@ export class WebhookService {
    * @param action - The notification type
    * @param data - The notification data
    */
-  async processAgentNotification(action: string, data: any): Promise<void> {
+  async processAgentNotification(_action: string, _data: any): Promise<void> {
     throw new Error('Not implemented')
   }
 }

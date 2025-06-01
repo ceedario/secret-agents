@@ -477,14 +477,14 @@ export class ExpressWebhookService extends WebhookService {
     });
     
     // Health check endpoint
-    app.get('/health', (_req: Request, res: Response) => {
-      res.status(200).send('Webhook server is running');
+    app.get('/health', (_req: Request, _res: Response) => {
+      _res.status(200).send('Webhook server is running');
     });
     
     // Add OAuth endpoints if oauthHelper is available
     if (this.oauthHelper) {
       // Add a dashboard that shows authentication status and provides helpful links
-      app.get('/', async (req: Request, res: Response) => {
+      app.get('/', async (_req: Request, _res: Response) => {
         try {
           const authStatus = await this.oauthHelper!.hasValidToken();
           const linearClientStatus = this.issueService.getAuthStatus();
@@ -551,7 +551,7 @@ export class ExpressWebhookService extends WebhookService {
             <h2>Webhook Information</h2>
             <p>For the Linear Agent API to work, you need to set up a webhook in Linear pointing to this server.</p>
             <div class="code">
-              <p>Webhook URL: <strong>${req.protocol}://${req.get('host')}/webhook</strong></p>
+              <p>Webhook URL: <strong>${_req.protocol}://${_req.get('host')}/webhook</strong></p>
               <p>Resource Types: Comments, Issues</p>
               <p>For Agent API: Enable "App User Notification" events</p>
             </div>
@@ -562,32 +562,32 @@ export class ExpressWebhookService extends WebhookService {
             </html>
           `;
           
-          res.send(html);
+          _res.send(html);
         } catch (error) {
           console.error('Error rendering dashboard:', error);
-          res.status(500).send('Error rendering dashboard: ' + (error as Error).message);
+          _res.status(500).send('Error rendering dashboard: ' + (error as Error).message);
         }
       });
       
       // OAuth authorization endpoint - redirects to Linear
-      app.get('/oauth/authorize', (_req: Request, res: Response) => {
+      app.get('/oauth/authorize', (_req: Request, _res: Response) => {
         try {
           const authUrl = this.oauthHelper!.generateAuthorizationUrl();
           console.log(`Redirecting to Linear OAuth authorization URL: ${authUrl}`);
-          res.redirect(authUrl);
+          _res.redirect(authUrl);
         } catch (error) {
           console.error('Error generating OAuth URL:', error);
-          res.status(500).send('Error setting up OAuth flow');
+          _res.status(500).send('Error setting up OAuth flow');
         }
       });
       
       // OAuth callback endpoint - handle the code from Linear
-      app.get('/oauth/callback', async (req: Request, res: Response): Promise<void> => {
+      app.get('/oauth/callback', async (_req: Request, _res: Response): Promise<void> => {
         try {
-          const { code, state } = req.query as { code?: string; state?: string };
+          const { code, state } = _req.query as { code?: string; state?: string };
           
           if (!code) {
-            res.status(400).send('Authorization code missing');
+            _res.status(400).send('Authorization code missing');
             return;
           }
           
@@ -621,7 +621,7 @@ export class ExpressWebhookService extends WebhookService {
             </html>
           `;
           
-          res.status(200).send(html);
+          _res.status(200).send(html);
           
           // Try to initialize the Linear client and fetch issues now
           console.log('Authentication successful! The agent will now attempt to use the new token.');
@@ -656,12 +656,12 @@ export class ExpressWebhookService extends WebhookService {
               </body>
             </html>
           `;
-          res.status(500).send(errorHtml);
+          _res.status(500).send(errorHtml);
         }
       });
       
       // OAuth reset endpoint - clear tokens and redirect to authorization
-      app.get('/oauth/reset', async (req: Request, res: Response) => {
+      app.get('/oauth/reset', async (_req: Request, _res: Response) => {
         try {
           console.log('Resetting OAuth tokens and starting new authorization flow');
           
@@ -669,24 +669,24 @@ export class ExpressWebhookService extends WebhookService {
           await this.oauthHelper!.clearTokens();
           
           // Redirect to the authorization endpoint
-          res.redirect('/oauth/authorize');
+          _res.redirect('/oauth/authorize');
         } catch (error) {
           console.error('Error resetting OAuth:', error);
-          res.status(500).send('Error resetting OAuth: ' + (error as Error).message);
+          _res.status(500).send('Error resetting OAuth: ' + (error as Error).message);
         }
       });
       
       // OAuth status endpoint - check if we have valid tokens
-      app.get('/oauth/status', async (req: Request, res: Response) => {
+      app.get('/oauth/status', async (_req: Request, _res: Response) => {
         try {
           const hasValidToken = await this.oauthHelper!.hasValidToken();
-          res.json({
+          _res.json({
             authenticated: hasValidToken,
             authType: hasValidToken ? 'oauth' : 'none'
           });
         } catch (error) {
           console.error('Error checking OAuth status:', error);
-          res.status(500).json({
+          _res.status(500).json({
             authenticated: false,
             error: (error as Error).message
           });

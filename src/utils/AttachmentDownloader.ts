@@ -41,7 +41,7 @@ export class AttachmentDownloader {
    * @param fileSystem - File system utility
    * @param oauthHelper - OAuth helper for token retrieval
    */
-  constructor(linearClient: LinearClient, fileSystem: FileSystem, oauthHelper: OAuthHelper | null = null) {
+  constructor(_linearClient: LinearClient, fileSystem: FileSystem, oauthHelper: OAuthHelper | null = null) {
     this.fileSystem = fileSystem
     this.oauthHelper = oauthHelper
   }

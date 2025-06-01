@@ -2,10 +2,10 @@ import { ExpressWebhookService } from '../../../src/adapters/ExpressWebhookServi
 import { vi, describe, beforeEach, it, expect } from 'vitest';
 
 describe('ExpressWebhookService', () => {
-  let webhookService;
-  let mockIssueService;
-  let mockHttpServer;
-  let mockOAuthHelper;
+  let webhookService: ExpressWebhookService;
+  let mockIssueService: any;
+  let mockHttpServer: any;
+  let mockOAuthHelper: any;
 
   beforeEach(() => {
     // Create mock services with manually implemented mocks

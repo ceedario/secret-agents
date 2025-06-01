@@ -18,7 +18,7 @@ export class WorkspaceService {
    * @param issue - The issue
    * @returns The workspace if it exists, or null
    */
-  async getWorkspaceForIssue(issue: Issue): Promise<Workspace | null> {
+  async getWorkspaceForIssue(_issue: Issue): Promise<Workspace | null> {
     throw new Error('Not implemented')
   }
   
@@ -27,7 +27,7 @@ export class WorkspaceService {
    * @param issue - The issue
    * @returns The created workspace
    */
-  async createWorkspace(issue: Issue): Promise<Workspace> {
+  async createWorkspace(_issue: Issue): Promise<Workspace> {
     throw new Error('Not implemented')
   }
   
@@ -35,7 +35,7 @@ export class WorkspaceService {
    * Clean up a specific workspace
    * @param workspace - The workspace to clean up
    */
-  async cleanupWorkspace(workspace: Workspace): Promise<void> {
+  async cleanupWorkspace(_workspace: Workspace): Promise<void> {
     throw new Error('Not implemented')
   }
   

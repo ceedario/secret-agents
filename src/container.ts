@@ -119,7 +119,7 @@ export function createContainer(): Container {
     
     // Return a proxy that initializes the client on first use
     return new Proxy({}, {
-      get(target, prop, receiver) {
+      get(_target, prop, _receiver) {
         // Intercept the function call
         return async function(...args: any[]) {
           const now = Date.now();

@@ -333,7 +333,7 @@ export class FSWorkspaceService extends WorkspaceService {
    * @returns Promise<boolean> - Whether it's a git worktree
    */
   async _createGitWorktree(workspacePath: string, branchName: string, mainBranch: string): Promise<boolean> {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
       const repoRoot = await this._getRepoRoot();
       
       if (!repoRoot) {

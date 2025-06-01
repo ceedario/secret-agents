@@ -1,4 +1,6 @@
+import { vi } from 'vitest';
+
 // Mock for node-fetch module
-const mockFetch = jest.fn();
+const mockFetch = vi.fn();
 
 export default mockFetch;
