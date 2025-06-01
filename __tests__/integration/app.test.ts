@@ -49,8 +49,26 @@ vi.mock('../../src/container.js', async () => {
     cleanupAllWorkspaces: vi.fn().mockResolvedValue(undefined)
   };
   
-  // Import the mocked config using dynamic import
-  const { default: mockConfig } = await import('../../src/config/env.js');
+  // Create mock config with validate function
+  const mockConfig = {
+    linear: {
+      apiToken: 'mock-token',
+      userId: 'mock-user-id',
+      username: 'mock-username',
+      webhookSecret: 'mock-secret',
+    },
+    webhook: {
+      port: 3000,
+    },
+    claude: {
+      path: '/mock/claude',
+      promptTemplatePath: '/mock/prompt.txt',
+    },
+    workspace: {
+      baseDir: '/mock/workspace',
+    },
+    validate: vi.fn().mockReturnValue(true),
+  };
   
   const mockContainer = {
     get: vi.fn((name) => {
@@ -116,14 +134,14 @@ describe('App', () => {
       // Create app instance
       const app = new App();
       
-      // Create a special mock function that will throw when invoked
-      const mockValidateFn = vi.fn().mockImplementation(() => {
+      // Get the container through reflection
+      const container = (app as any).container;
+      const config = container.get('config');
+      
+      // Replace the validate method to throw
+      config.validate.mockImplementation(() => {
         throw new Error('Configuration validation error');
       });
-      
-      // Replace the validate method
-      const originalValidate = (app as any).container.get('config').validate;
-      (app as any).container.get('config').validate = mockValidateFn;
       
       // Spy on console.error
       const consoleErrorSpy = vi.spyOn(console, 'error');
@@ -143,8 +161,8 @@ describe('App', () => {
       // Verify shutdown was called
       expect(app.shutdown).toHaveBeenCalled();
       
-      // Restore original method
-      (app as any).container.get('config').validate = originalValidate;
+      // Reset validate mock for next test
+      config.validate.mockReturnValue(true);
     });
   });
   
