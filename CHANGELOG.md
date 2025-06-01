@@ -5,12 +5,23 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- TypeScript support for the entire codebase
+  - Migrated all JavaScript files (.mjs) to TypeScript (.ts)
+  - Added comprehensive type definitions for all classes and interfaces
+  - Configured TypeScript with strict mode for better type safety
+  - Added build script to compile TypeScript to JavaScript
 - Coverage folder to .gitignore to prevent test coverage reports from being tracked
 - AttachmentDownloader class to handle all types of Linear attachments (not just images)
   - Supports downloading any file type from Linear's authenticated storage
   - Automatically detects file types and categorizes them as images or other attachments
   - Gracefully handles download failures with informative warnings
   - Replaces the previous ImageDownloader with a more comprehensive solution
+
+### Changed
+- All source files from ES modules (.mjs) to TypeScript (.ts)
+- Build output now goes to dist/ directory
+- Package.json main entry point updated to dist/index.js
+- Added TypeScript compilation step before running the application
 
 ### Removed
 - Coverage folder from git tracking (now properly ignored)

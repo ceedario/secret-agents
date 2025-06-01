@@ -1,6 +1,6 @@
-import { Session } from '../../../src/core/Session.mjs';
-import { Issue } from '../../../src/core/Issue.mjs';
-import { Workspace } from '../../../src/core/Workspace.mjs';
+import { Session } from '../../../src/core/Session.js';
+import { Issue } from '../../../src/core/Issue.js';
+import { Workspace } from '../../../src/core/Workspace.js';
 
 describe('Session', () => {
   // Create mock issue and workspace

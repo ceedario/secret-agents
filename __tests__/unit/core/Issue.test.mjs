@@ -1,4 +1,4 @@
-import { Issue } from '../../../src/core/Issue.mjs';
+import { Issue } from '../../../src/core/Issue.js';
 
 describe('Issue', () => {
   const mockIssueData = {

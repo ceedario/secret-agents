@@ -14,7 +14,7 @@ jest.unstable_mockModule('file-type', () => ({
 const fetch = (await import('node-fetch')).default
 const { fileTypeFromBuffer } = await import('file-type')
 const { AttachmentDownloader } = await import('../../../src/utils/AttachmentDownloader.mjs')
-const { Issue } = await import('../../../src/core/Issue.mjs')
+const { Issue } = await import('../../../src/core/Issue.js')
 
 describe('AttachmentDownloader', () => {
   let attachmentDownloader

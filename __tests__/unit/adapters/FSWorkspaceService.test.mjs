@@ -23,7 +23,7 @@ jest.mock('path', () => ({
 // Mock core classes
 jest.mock('../../../src/utils/FileSystem.mjs');
 jest.mock('../../../src/utils/ProcessManager.mjs');
-jest.mock('../../../src/core/Workspace.mjs', () => ({
+jest.mock('../../../src/core/Workspace.js', () => ({
   Workspace: jest.fn().mockImplementation(data => data)
 }));
 
