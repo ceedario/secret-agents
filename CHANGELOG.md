@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Linear API documentation references section in CLAUDE.md (CEA-65)
+  - Added comprehensive Linear GraphQL API documentation URLs
+  - Added core Linear object field references (Issue, Comment, Team, User, WorkflowState)
+  - Added enum and type references for states, priorities, and comment types
+  - Added webhook, authentication, and SDK documentation links
+- External API and tool documentation references in CLAUDE.md (CEA-65)
+  - Added Node.js, Express.js, and library documentation links
+  - Added testing framework (Vitest) documentation references
+  - Added Git, GitHub CLI, and OAuth 2.0 specification links
+
 ### Fixed
 - Streaming updates posting to wrong comment on subsequent interactions
   - Fixed session management bug where new streaming comment ID wasn't being passed to Claude process handlers
