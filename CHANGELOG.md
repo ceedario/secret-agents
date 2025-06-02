@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Automatic thread resolution after Claude session completion (CEA-66)
+  - Added `resolveCommentThread()` method to LinearIssueService with fallback support (SDK → GraphQL)
+  - Implemented `postFinalResponseAndResolve()` in NodeClaudeService to automatically resolve reasoning threads
+  - Thread resolution prioritizes user conversation threads over agent-initiated threads
+  - Enhanced session management to track thread context for intelligent resolution
+  - Added comprehensive test coverage for thread resolution scenarios and error handling
+  - Graceful degradation when Linear API doesn't support comment resolution
+
 ### Fixed
 - Streaming updates posting to wrong comment on subsequent interactions
   - Fixed session management bug where new streaming comment ID wasn't being passed to Claude process handlers
