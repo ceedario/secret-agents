@@ -339,6 +339,72 @@ export class LinearIssueService extends IssueService {
   }
 
   /**
+   * Resolve a comment thread with an optional resolving comment
+   * @param {string} commentId - The comment ID to resolve (typically the root comment)
+   * @param {string} resolvingCommentId - Optional comment ID that resolves the thread
+   * @returns {Promise<boolean>} - Success status
+   */
+  async resolveCommentThread(commentId, resolvingCommentId = null) {
+    console.log(`===== RESOLVING COMMENT THREAD ${commentId} =====`);
+    if (resolvingCommentId) {
+      console.log(`Resolving with comment: ${resolvingCommentId}`);
+    }
+    
+    try {
+      console.log('Sending thread resolution to Linear API...');
+      
+      // Use Linear GraphQL mutation directly since the SDK might not have commentResolve method
+      const mutation = `
+        mutation CommentResolve($id: String!, $resolvingCommentId: String) {
+          commentResolve(id: $id, resolvingCommentId: $resolvingCommentId) {
+            success
+            comment {
+              id
+              resolved
+            }
+          }
+        }
+      `;
+      
+      const variables = {
+        id: commentId,
+        resolvingCommentId: resolvingCommentId
+      };
+      
+      // Use the Linear client's _request method to make a direct GraphQL call
+      const response = await this.linearClient._request(mutation, variables);
+      
+      // Only log detailed API response in debug mode
+      if (process.env.DEBUG_LINEAR_API === 'true') {
+        console.log('Linear API response for commentResolve:');
+        console.log(JSON.stringify(response, null, 2));
+      }
+      
+      if (response && response.commentResolve && response.commentResolve.success) {
+        console.log(`✅ Successfully resolved comment thread ${commentId}`);
+        return true;
+      } else {
+        console.error(`Failed to resolve comment thread ${commentId}: API returned unsuccessful response`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`Failed to resolve comment thread ${commentId}:`, error);
+      
+      // Only log detailed error in debug mode
+      if (process.env.DEBUG_LINEAR_API === 'true') {
+        console.error('Error details:', JSON.stringify(error, null, 2));
+      }
+      
+      // If the error suggests the method doesn't exist, log a helpful message
+      if (error.message && error.message.includes('_request')) {
+        console.warn(`Thread resolution requires direct GraphQL access which may not be available in this Linear SDK version. Thread will not be resolved.`);
+      }
+      
+      return false;
+    }
+  }
+
+  /**
    * @inheritdoc
    */
   async createComment(issueId, body, parentId = null) {

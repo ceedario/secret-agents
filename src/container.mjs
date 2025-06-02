@@ -381,7 +381,8 @@ export function createContainer() {
       {
         createComment: (...args) => issueService.createComment(...args),
         createCommentAndGetId: (...args) => issueService.createCommentAndGetId(...args),
-        updateComment: (...args) => issueService.updateComment(...args)
+        updateComment: (...args) => issueService.updateComment(...args),
+        resolveCommentThread: (...args) => issueService.resolveCommentThread(...args)
       },
       fileSystem,
       processManager,
