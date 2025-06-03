@@ -1,4 +1,5 @@
 import { vi } from 'vitest'
+
 import { LinearIssueService } from '../../../src/adapters/LinearIssueService.mjs'
 
 describe('Threaded Comments Integration', () => {

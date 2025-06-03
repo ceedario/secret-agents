@@ -1,5 +1,5 @@
-import { Session } from '../../../src/core/Session.mjs';
 import { Issue } from '../../../src/core/Issue.mjs';
+import { Session } from '../../../src/core/Session.mjs';
 import { Workspace } from '../../../src/core/Workspace.mjs';
 
 describe('Session', () => {

@@ -5,10 +5,11 @@
  * Run with: node scripts/reset-oauth.mjs [--env-file <path>]
  */
 
+import { parseArgs } from 'node:util';
+
+import dotenv from 'dotenv';
 import fs from 'fs-extra';
 import path from 'path';
-import dotenv from 'dotenv';
-import { parseArgs } from 'node:util';
 
 // Parse command line arguments
 const options = {

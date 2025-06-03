@@ -1,5 +1,6 @@
-import { LinearIssueService } from '../../../src/adapters/LinearIssueService.mjs'
 import { vi } from 'vitest'
+
+import { LinearIssueService } from '../../../src/adapters/LinearIssueService.mjs'
 
 describe('LinearIssueService', () => {
   let linearIssueService

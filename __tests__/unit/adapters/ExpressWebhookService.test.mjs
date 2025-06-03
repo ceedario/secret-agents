@@ -1,5 +1,6 @@
-import { ExpressWebhookService } from '../../../src/adapters/ExpressWebhookService.mjs';
 import { vi } from 'vitest';
+
+import { ExpressWebhookService } from '../../../src/adapters/ExpressWebhookService.mjs';
 
 describe('ExpressWebhookService', () => {
   let webhookService;

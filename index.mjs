@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import dotenv from 'dotenv';
 import { parseArgs } from 'node:util';
+
+import dotenv from 'dotenv';
 import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
 // Get package.json for version info
 const __filename = fileURLToPath(import.meta.url);

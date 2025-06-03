@@ -1,5 +1,5 @@
-import { IssueService } from '../services/IssueService.mjs';
 import { Issue } from '../core/Issue.mjs';
+import { IssueService } from '../services/IssueService.mjs';
 import { LinearIssueSchema } from '../utils/schemas.mjs';
 
 /**

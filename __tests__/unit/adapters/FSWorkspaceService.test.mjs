@@ -1,8 +1,9 @@
-import { FSWorkspaceService } from '../../../src/adapters/FSWorkspaceService.mjs';
-import { WorkspaceService } from '../../../src/services/WorkspaceService.mjs';
 import fs from 'fs-extra';
 import path from 'path';
 import { vi } from 'vitest';
+
+import { FSWorkspaceService } from '../../../src/adapters/FSWorkspaceService.mjs';
+import { WorkspaceService } from '../../../src/services/WorkspaceService.mjs';
 
 // Create a mock implementation of the required classes
 vi.mock('fs-extra', async () => {

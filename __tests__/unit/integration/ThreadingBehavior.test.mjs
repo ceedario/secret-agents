@@ -1,10 +1,11 @@
 import { vi } from 'vitest'
+
 import { LinearIssueService } from '../../../src/adapters/LinearIssueService.mjs'
 import { NodeClaudeService } from '../../../src/adapters/NodeClaudeService.mjs'
-import { SessionManager } from '../../../src/services/SessionManager.mjs'
-import { Session } from '../../../src/core/Session.mjs'
 import { Issue } from '../../../src/core/Issue.mjs'
+import { Session } from '../../../src/core/Session.mjs'
 import { Workspace } from '../../../src/core/Workspace.mjs'
+import { SessionManager } from '../../../src/services/SessionManager.mjs'
 
 describe('Linear Threading Behavior', () => {
   let issueService

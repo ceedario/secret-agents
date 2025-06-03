@@ -1,8 +1,9 @@
-import { FileSystem } from '../../../src/utils/FileSystem.mjs';
 import fs from 'fs-extra';
-import path from 'path';
 import os from 'os';
+import path from 'path';
 import { vi } from 'vitest';
+
+import { FileSystem } from '../../../src/utils/FileSystem.mjs';
 
 // Create a simple test suite that verifies the FileSystem class properly forwards calls to the underlying implementations
 describe('FileSystem', () => {

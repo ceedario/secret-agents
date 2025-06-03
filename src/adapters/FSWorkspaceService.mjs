@@ -1,9 +1,9 @@
 import { spawn } from 'child_process';
-import path from 'path';
 import fs from 'fs-extra';
+import path from 'path';
 
-import { WorkspaceService } from '../services/WorkspaceService.mjs';
 import { Workspace } from '../core/Workspace.mjs';
+import { WorkspaceService } from '../services/WorkspaceService.mjs';
 import { FileSystem, ProcessManager } from '../utils/index.mjs';
 
 /**
