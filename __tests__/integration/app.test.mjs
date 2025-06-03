@@ -1,5 +1,6 @@
-import { App } from '../../src/app.mjs';
 import { vi } from 'vitest';
+
+import { App } from '../../src/app.mjs';
 
 // Mock the dotenv config
 vi.mock('dotenv/config', () => {});

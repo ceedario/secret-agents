@@ -1,6 +1,6 @@
+import { fileTypeFromBuffer } from 'file-type'
 import fetch from 'node-fetch'
 import path from 'path'
-import { fileTypeFromBuffer } from 'file-type'
 
 /**
  * Utility class for downloading attachments from Linear with proper authentication

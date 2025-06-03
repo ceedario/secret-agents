@@ -1,8 +1,9 @@
-import { ClaudeService } from '../services/ClaudeService.mjs';
-import { Session } from '../core/Session.mjs';
-import { claudeConfig, env } from '../config/index.mjs';
-import { FileSystem, ProcessManager } from '../utils/index.mjs';
 import path from 'path';
+
+import { claudeConfig, env } from '../config/index.mjs';
+import { Session } from '../core/Session.mjs';
+import { ClaudeService } from '../services/ClaudeService.mjs';
+import { FileSystem, ProcessManager } from '../utils/index.mjs';
 
 /**
  * Implementation of ClaudeService using Node.js child_process

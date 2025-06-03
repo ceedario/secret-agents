@@ -1,14 +1,13 @@
 import { LinearClient } from '@linear/sdk';
 
-import { env } from './config/index.mjs';
 import { 
-  LinearIssueService, 
+  ExpressWebhookService, 
   FSWorkspaceService, 
-  NodeClaudeService, 
-  ExpressWebhookService 
-} from './adapters/index.mjs';
+  LinearIssueService, 
+  NodeClaudeService} from './adapters/index.mjs';
+import { env } from './config/index.mjs';
 import { SessionManager } from './services/index.mjs';
-import { FileSystem, ProcessManager, HttpServer, OAuthHelper, AttachmentDownloader } from './utils/index.mjs';
+import { AttachmentDownloader,FileSystem, HttpServer, OAuthHelper, ProcessManager } from './utils/index.mjs';
 
 /**
  * Simple dependency injection container

@@ -5,12 +5,14 @@
  * Run with: node scripts/start-auth-server.mjs [--env-file <path>]
  */
 
-import express from 'express';
-import dotenv from 'dotenv';
-import { OAuthHelper } from '../src/utils/OAuthHelper.mjs';
-import { FileSystem } from '../src/utils/FileSystem.mjs';
-import fetch from 'node-fetch'; // Ensure node-fetch is used in Node.js environment
 import { parseArgs } from 'node:util';
+
+import dotenv from 'dotenv';
+import express from 'express';
+import fetch from 'node-fetch'; // Ensure node-fetch is used in Node.js environment
+
+import { FileSystem } from '../src/utils/FileSystem.mjs';
+import { OAuthHelper } from '../src/utils/OAuthHelper.mjs';
 
 // Parse command line arguments
 const options = {

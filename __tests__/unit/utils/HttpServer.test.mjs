@@ -1,6 +1,7 @@
-import { HttpServer } from '../../../src/utils/HttpServer.mjs';
 import express from 'express';
 import { vi } from 'vitest';
+
+import { HttpServer } from '../../../src/utils/HttpServer.mjs';
 
 describe('HttpServer', () => {
   let httpServer;

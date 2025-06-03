@@ -15,7 +15,9 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "oauth:server": "node scripts/start-auth-server.mjs",
-    "oauth:reset": "node scripts/reset-oauth.mjs"
+    "oauth:reset": "node scripts/reset-oauth.mjs",
+    "lint": "eslint --max-warnings 0 --cache --cache-strategy content",
+    "lint:fix": "eslint --max-warnings 0 --cache --cache-strategy content --fix"
   },
   "packageManager": "pnpm@10.11.0",
   "keywords": [
@@ -49,7 +51,10 @@
   },
   "devDependencies": {
     "@vitest/ui": "^3.1.4",
+    "eslint": "^9.28.0",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "nodemon": "^2.0.22",
+    "prettier": "^3.5.3",
     "vitest": "^3.1.4"
   }
 }

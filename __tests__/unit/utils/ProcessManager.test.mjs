@@ -1,6 +1,7 @@
-import { ProcessManager } from '../../../src/utils/ProcessManager.mjs';
 import * as childProcess from 'child_process';
 import { vi } from 'vitest';
+
+import { ProcessManager } from '../../../src/utils/ProcessManager.mjs';
 
 // We'll only test the wait method which doesn't rely on the child_process module
 describe('ProcessManager', () => {
