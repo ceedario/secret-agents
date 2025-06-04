@@ -306,7 +306,8 @@ history are preserved. Please continue your work on the issue.]
                   }
                 }
                 
-                this.postResponseToLinear(issue.id, lastAssistantResponseText, null, null, parentId);
+                // Post the final response and get its ID for thread resolution
+                this.postFinalResponseAndResolve(issue.id, lastAssistantResponseText, parentId, session);
                 lastAssistantResponseText = '';
               } else {
                 // Post a message indicating no final content
@@ -320,10 +321,12 @@ history are preserved. Please continue your work on the issue.]
                   parentId = session.currentParentId || session.agentRootCommentId;
                 }
                 
-                this.postResponseToLinear(
+                // Post the notice and resolve the thread
+                this.postFinalResponseAndResolve(
                   issue.id, 
                   `I had no final comment, see my last comment to see where I left off`,
-                  null, null, parentId
+                  parentId,
+                  session
                 );
               }
             }
@@ -1140,6 +1143,56 @@ CLAUDE_INPUT_EOF`;
       return success;
     } catch (error) {
       console.error(`[STREAMING - ${issueId}] Error updating streaming comment:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Post a final response to Linear and automatically resolve the thread
+   * @param {string} issueId - The issue ID
+   * @param {string} response - The response content
+   * @param {string} parentId - Optional parent comment ID for threading
+   * @param {Session} session - The session object for tracking context
+   * @returns {Promise<boolean>} - Success status
+   */
+  async postFinalResponseAndResolve(issueId, response, parentId = null, session = null) {
+    try {
+      console.log(`[THREAD RESOLUTION - ${issueId}] Posting final response and resolving thread`);
+      
+      // Post the final response and get the comment ID
+      const result = await this.issueService.createCommentAndGetId(issueId, response, parentId);
+      
+      if (result.success && result.commentId) {
+        console.log(`[THREAD RESOLUTION - ${issueId}] Final comment posted: ${result.commentId}`);
+        
+        // Determine which comment thread to resolve
+        let threadRootId = null;
+        
+        if (session && session.currentParentId) {
+          // If we're in a user conversation thread, resolve that thread using the final comment
+          threadRootId = session.currentParentId;
+          console.log(`[THREAD RESOLUTION - ${issueId}] Resolving user conversation thread: ${threadRootId} with resolving comment: ${result.commentId}`);
+          
+          // Resolve the thread with the final comment as the resolving comment
+          await this.issueService.resolveCommentThread(threadRootId, result.commentId);
+        } else if (session && session.agentRootCommentId) {
+          // If we're in an agent-initiated thread, resolve that thread using the final comment
+          threadRootId = session.agentRootCommentId;
+          console.log(`[THREAD RESOLUTION - ${issueId}] Resolving agent-initiated thread: ${threadRootId} with resolving comment: ${result.commentId}`);
+          
+          // Resolve the thread with the final comment as the resolving comment
+          await this.issueService.resolveCommentThread(threadRootId, result.commentId);
+        } else {
+          console.log(`[THREAD RESOLUTION - ${issueId}] No thread context found, skipping resolution`);
+        }
+        
+        return true;
+      } else {
+        console.error(`[THREAD RESOLUTION - ${issueId}] Failed to post final comment`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`[THREAD RESOLUTION - ${issueId}] Failed to post final response and resolve thread:`, error);
       return false;
     }
   }
