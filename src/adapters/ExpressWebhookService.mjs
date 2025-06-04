@@ -1,13 +1,12 @@
-import crypto from 'crypto';
+import crypto from "crypto";
 
-import { WebhookService } from '../services/WebhookService.mjs';
-import { 
-  HttpServer, 
-  AgentNotificationWebhookSchema, 
+import { WebhookService } from "../services/WebhookService.mjs";
+import {
+  HttpServer,
+  AgentNotificationWebhookSchema,
   CommentWebhookSchema,
   IssueWebhookSchema,
-  NotificationSchema
-} from '../utils/index.mjs';
+} from "../utils/index.mjs";
 
 /**
  * Implementation of WebhookService using Express
@@ -19,7 +18,12 @@ export class ExpressWebhookService extends WebhookService {
    * @param {HttpServer} httpServer - HTTP server utility
    * @param {OAuthHelper} oauthHelper - OAuth helper utility
    */
-  constructor(webhookSecret, issueService, httpServer = new HttpServer(), oauthHelper = null) {
+  constructor(
+    webhookSecret,
+    issueService,
+    httpServer = new HttpServer(),
+    oauthHelper = null
+  ) {
     super();
     this.webhookSecret = webhookSecret;
     this.issueService = issueService;
@@ -27,57 +31,71 @@ export class ExpressWebhookService extends WebhookService {
     this.oauthHelper = oauthHelper;
     this.server = null;
   }
-  
+
   /**
    * @inheritdoc
    */
   verifySignature(req) {
-    const signature = req.headers['linear-signature'];
-    
+    const signature = req.headers["linear-signature"];
+
     if (!signature) {
-      console.log('No linear-signature header found');
+      console.log("No linear-signature header found");
       return false;
     }
-    
+
     // Check for raw body in both buffer and string form
     if (!req.rawBodyBuffer && !req.rawBody) {
-      console.error('No raw body available for signature verification. This is required!');
+      console.error(
+        "No raw body available for signature verification. This is required!"
+      );
       return false;
     }
-    
+
     try {
       // Use the raw request body exactly as received from Linear
-      const hmac = crypto.createHmac('sha256', this.webhookSecret);
-      
+      const hmac = crypto.createHmac("sha256", this.webhookSecret);
+
       // Prefer buffer for binary consistency
       if (req.rawBodyBuffer) {
         hmac.update(req.rawBodyBuffer);
       } else {
         hmac.update(req.rawBody);
       }
-      
-      const computedSignature = hmac.digest('hex');
-      
+
+      const computedSignature = hmac.digest("hex");
+
       // Extra debug logging only if DEBUG_WEBHOOKS is true
-      if (process.env.DEBUG_WEBHOOKS === 'true') {
-        console.log(`Received signature: ${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}`);
-        console.log(`Computed signature: ${computedSignature.substring(0, 8)}...${computedSignature.substring(computedSignature.length - 8)}`);
+      if (process.env.DEBUG_WEBHOOKS === "true") {
+        console.log(
+          `Received signature: ${signature.substring(
+            0,
+            8
+          )}...${signature.substring(signature.length - 8)}`
+        );
+        console.log(
+          `Computed signature: ${computedSignature.substring(
+            0,
+            8
+          )}...${computedSignature.substring(computedSignature.length - 8)}`
+        );
       }
-      
+
       // Check if signatures match
-      const signatureMatches = (signature === computedSignature);
-      
-      if (!signatureMatches && process.env.DEBUG_WEBHOOKS === 'true') {
-        console.log('❌ Signature mismatch. Check webhook secret configuration.');
+      const signatureMatches = signature === computedSignature;
+
+      if (!signatureMatches && process.env.DEBUG_WEBHOOKS === "true") {
+        console.log(
+          "❌ Signature mismatch. Check webhook secret configuration."
+        );
       }
-      
+
       return signatureMatches;
     } catch (error) {
-      console.error('Error verifying webhook signature:', error);
+      console.error("Error verifying webhook signature:", error);
       return false;
     }
   }
-  
+
   /**
    * Process a legacy webhook event
    * @param {string} type - The event type (Comment, Issue, etc.)
@@ -87,62 +105,68 @@ export class ExpressWebhookService extends WebhookService {
    */
   async processEvent(type, action, data) {
     console.log(`Processing legacy event of type: ${type}/${action}`);
-    
+
     // Check if we're authenticated before processing events that require API calls
     if (!this.issueService.getAuthStatus()) {
-      console.log('⚠️ Received webhook event but not authenticated with Linear API.');
-      console.log(`Webhook event ${type}/${action} ignored. Complete the OAuth flow first.`);
+      console.log(
+        "⚠️ Received webhook event but not authenticated with Linear API."
+      );
+      console.log(
+        `Webhook event ${type}/${action} ignored. Complete the OAuth flow first.`
+      );
       return;
     }
-    
+
     // Handle comment creation events
-    if (type === 'Comment' && action === 'create') {
+    if (type === "Comment" && action === "create") {
       // Additional validation for comment fields we need
       if (!data.issueId || !data.body) {
-        console.error('Comment data missing required fields:', data);
+        console.error("Comment data missing required fields:", data);
         return;
       }
-      
+
       // IMPORTANT: Check if this comment is from the agent itself to prevent infinite loops
       const agentUserId = this.issueService.userId;
       if (data.user?.id === agentUserId) {
         // Only log minimal information for agent's own comments
-        if (process.env.DEBUG_SELF_WEBHOOKS === 'true') {
-          console.log('⚠️ Ignoring comment from the agent itself (preventing infinite loop)');
+        if (process.env.DEBUG_SELF_WEBHOOKS === "true") {
+          console.log(
+            "⚠️ Ignoring comment from the agent itself (preventing infinite loop)"
+          );
         }
         return; // Skip processing this comment
       }
-      
+
       await this.issueService.handleCommentEvent(data);
     }
-    
+
     // Handle issue update events (for assignee changes, etc.)
-    else if (type === 'Issue' && action === 'update') {
+    else if (type === "Issue" && action === "update") {
       if (!data.id || !data.identifier) {
-        console.error('Issue update data missing required fields:', data);
+        console.error("Issue update data missing required fields:", data);
         return;
       }
-      
+
       await this.issueService.handleIssueUpdateEvent(data);
     }
-    
+
     // Handle issue creation events
-    else if (type === 'Issue' && action === 'create') {
+    else if (type === "Issue" && action === "create") {
       if (!data.id || !data.identifier || !data.title) {
-        console.error('Issue create data missing required fields:', data);
+        console.error("Issue create data missing required fields:", data);
         return;
       }
-      
+
       await this.issueService.handleIssueCreateEvent(data);
     }
-    
+
     // Log unhandled event types for analysis
     else {
       console.log(`Unhandled legacy webhook type: ${type}/${action}`);
-      console.log('Data:', JSON.stringify(data, null, 2));
+      console.log("Data:", JSON.stringify(data, null, 2));
     }
   }
-  
+
   /**
    * Process agent notification based on its type
    * @param {string} action - The notification action type
@@ -152,85 +176,99 @@ export class ExpressWebhookService extends WebhookService {
   async processAgentNotification(action, data) {
     // Basic log message - format depends on notification type
     // For agent settings notifications, there's no issue to mention
-    if (data.type === 'agentAssignable') {
+    if (data.type === "agentAssignable") {
       console.log(`Processing ${action} agent settings notification`);
     } else {
-      console.log(`Processing ${action} notification on issue ${data.issue?.identifier || data.issueId}`);
+      console.log(
+        `Processing ${action} notification on issue ${
+          data.issue?.identifier || data.issueId
+        }`
+      );
     }
-    
+
     // Keep a concise log if not in debug mode
-    if (process.env.DEBUG_WEBHOOKS === 'true') {
+    if (process.env.DEBUG_WEBHOOKS === "true") {
       // Log notification data details only in debug mode
-      console.log('Notification data:', JSON.stringify(data, null, 2));
+      console.log("Notification data:", JSON.stringify(data, null, 2));
     }
-    
+
     // Check if we're authenticated before processing events that require API calls
     if (!this.issueService.getAuthStatus()) {
-      console.log('⚠️ Received agent notification but not authenticated with Linear API.');
-      console.log(`Agent notification ${action} ignored. Complete the OAuth flow first.`);
+      console.log(
+        "⚠️ Received agent notification but not authenticated with Linear API."
+      );
+      console.log(
+        `Agent notification ${action} ignored. Complete the OAuth flow first.`
+      );
       return;
     }
-    
+
     // FIRST - Check if ANY notification is from the agent itself
     // Get the agent's userId from the issueService
     const agentUserId = this.issueService.userId;
-    
+
     // This is a CRITICAL universal check to prevent infinite loops
     // We need to check BOTH the actor.id and comment.userId if they exist
     if (
-      (data.actor?.id === agentUserId) || 
-      (data.comment?.userId === agentUserId)
+      data.actor?.id === agentUserId ||
+      data.comment?.userId === agentUserId
     ) {
       // Only log minimal information for agent's own notifications
-      if (process.env.DEBUG_SELF_WEBHOOKS === 'true') {
-        console.log('⚠️ Ignoring notification from the agent itself (preventing infinite loop)');
-        console.log(`Agent ID: ${agentUserId}, Actor ID: ${data.actor?.id}, Comment User ID: ${data.comment?.userId}`);
+      if (process.env.DEBUG_SELF_WEBHOOKS === "true") {
+        console.log(
+          "⚠️ Ignoring notification from the agent itself (preventing infinite loop)"
+        );
+        console.log(
+          `Agent ID: ${agentUserId}, Actor ID: ${data.actor?.id}, Comment User ID: ${data.comment?.userId}`
+        );
       }
       return; // Exit early, don't process this notification
     }
-    
+
     // First check the notification type (this is more specific than action)
-    if (data.type === 'agentAssignable') {
-      console.log('Agent is now assignable to issues');
+    if (data.type === "agentAssignable") {
+      console.log("Agent is now assignable to issues");
       // This is just a status update, no action needed
       return;
     }
-    
+
     // Handle issue assigned to the agent
-    if (data.type === 'issueAssignedToYou') {
-      console.log(`Issue ${data.issue.identifier} assigned to agent by ${data.actor.name}`);
+    if (data.type === "issueAssignedToYou") {
+      console.log(
+        `Issue ${data.issue.identifier} assigned to agent by ${data.actor.name}`
+      );
       const assignmentData = {
         issueId: data.issueId,
         issue: data.issue,
-        actor: data.actor
+        actor: data.actor,
       };
       await this.issueService.handleAgentAssignment(assignmentData);
       return;
     }
-    
+
     // Handle different notification types based on action
     switch (action) {
       // Legacy notification types
-      case 'mention':
-        console.log('Agent was mentioned in a comment (legacy format)');
+      case "mention":
+        console.log("Agent was mentioned in a comment (legacy format)");
         await this.issueService.handleAgentMention(data);
         break;
-        
+
       // Handle when agent is assigned to an issue
-      case 'assigned':
-        console.log('Agent was assigned to an issue');
+      case "assigned":
+        console.log("Agent was assigned to an issue");
         await this.issueService.handleAgentAssignment(data);
         break;
-        
+
       // Handle when someone replies to agent's comment
-      case 'reply':
-        console.log('Someone replied to agent\'s comment');
+      case "reply":
+        console.log("Someone replied to agent's comment");
         await this.issueService.handleAgentReply(data);
         break;
-      
-      // New Agent API notification types  
-      case 'issueCommentMention':
-        console.log('Agent was mentioned in a comment (Agent API format)');
+
+      // New Agent API notification types
+      case "issueCommentMention":
+        console.log("Agent was mentioned in a comment (Agent API format)");
         // Since we've already validated with Zod, we can be confident that we have the right structure
         // But we still extract the relevant parts for the handler method
         const mentionData = {
@@ -238,83 +276,98 @@ export class ExpressWebhookService extends WebhookService {
           comment: data.comment,
           issueId: data.issueId,
           issue: data.issue,
-          actor: data.actor
+          actor: data.actor,
         };
         await this.issueService.handleAgentMention(mentionData);
         break;
-        
-      case 'issueAssignment':
-        console.log('Agent was assigned to an issue (Agent API format)');
+
+      case "issueAssignment":
+        console.log("Agent was assigned to an issue (Agent API format)");
         const assignmentData = {
           issueId: data.issueId,
           issue: data.issue,
-          actor: data.actor
+          actor: data.actor,
         };
         await this.issueService.handleAgentAssignment(assignmentData);
         break;
-      
-      case 'issueCommentReply':
-        console.log('Someone replied to agent\'s comment (Agent API format)');
+
+      case "issueCommentReply":
+        console.log("Someone replied to agent's comment (Agent API format)");
         const replyData = {
           commentId: data.commentId,
           comment: data.comment,
           issueId: data.issueId,
           issue: data.issue,
-          actor: data.actor
+          actor: data.actor,
         };
         await this.issueService.handleAgentReply(replyData);
         break;
-        
-      case 'issueNewComment':
-        console.log('New comment on an issue assigned to the agent');
-        
+
+      case "issueNewComment":
+        console.log("New comment on an issue assigned to the agent");
+
         // Only process comments from other users (not from the agent)
         const newCommentData = {
           commentId: data.commentId,
           comment: data.comment,
           issueId: data.issueId,
           issue: data.issue,
-          actor: data.actor
+          actor: data.actor,
         };
-        console.log(`New comment by ${data.actor.name} on issue ${data.issue.identifier}: ${data.comment.body.substring(0, 100)}${data.comment.body.length > 100 ? '...' : ''}`);
-        
+        console.log(
+          `New comment by ${data.actor.name} on issue ${
+            data.issue.identifier
+          }: ${data.comment.body.substring(0, 100)}${
+            data.comment.body.length > 100 ? "..." : ""
+          }`
+        );
+
         // Check if comment mentions other users but not the agent
         // Get the agent's username from the issueService
         const agentUsername = this.issueService.username;
-        const commentBody = data.comment?.body || '';
-        
+        const commentBody = data.comment?.body || "";
+
         // Check if comment contains any @ mentions
-        const hasMentions = commentBody.includes('@');
-        const mentionsAgent = agentUsername && commentBody.includes(`@${agentUsername}`);
-        
+        const hasMentions = commentBody.includes("@");
+        const mentionsAgent =
+          agentUsername && commentBody.includes(`@${agentUsername}`);
+
         if (!hasMentions || mentionsAgent) {
           // Process if: no mentions at all OR agent is mentioned
-          console.log(`Processing comment: ${!hasMentions ? 'no mentions' : `mentions agent @${agentUsername}`}`);
+          console.log(
+            `Processing comment: ${
+              !hasMentions ? "no mentions" : `mentions agent @${agentUsername}`
+            }`
+          );
           await this.issueService.handleAgentMention(newCommentData);
         } else {
           // Skip if: has mentions but agent is NOT mentioned
-          console.log(`Comment mentions other users but not agent @${agentUsername}, ignoring.`);
+          console.log(
+            `Comment mentions other users but not agent @${agentUsername}, ignoring.`
+          );
         }
         break;
 
-      case 'issueUnassignedFromYou':
-        console.log('Agent was unassigned from an issue');
+      case "issueUnassignedFromYou":
+        console.log("Agent was unassigned from an issue");
         // Handle the unassignment by terminating any active sessions
         await this.issueService.handleAgentUnassignment({
           issueId: data.issueId,
           issue: data.issue,
-          actor: data.actor
+          actor: data.actor,
         });
         break;
-        
+
       // Log any other notification types for analysis
       default:
-        console.log(`Unhandled agent notification type: ${action} (${data.type})`);
-        console.log('Please analyze the data structure for implementation');
+        console.log(
+          `Unhandled agent notification type: ${action} (${data.type})`
+        );
+        console.log("Please analyze the data structure for implementation");
         break;
     }
   }
-  
+
   /**
    * @inheritdoc
    */
@@ -322,143 +375,158 @@ export class ExpressWebhookService extends WebhookService {
     const app = this.httpServer.createServer();
     // Apply each middleware function individually
     const middlewares = this.httpServer.jsonParser();
-    middlewares.forEach(middleware => app.use(middleware));
-    
+    middlewares.forEach((middleware) => app.use(middleware));
+
     // Webhook endpoint
-    app.post('/webhook', (req, res) => {
+    app.post("/webhook", (req, res) => {
       // First, ensure the body is parsed correctly
       if (!req.body) {
-        console.error('Request body is undefined. This may indicate a JSON parsing error.');
-        console.log('Raw body:', req.rawBody?.substring(0, 100) || 'Not available');
-        return res.status(400).send('Invalid JSON payload');
+        console.error(
+          "Request body is undefined. This may indicate a JSON parsing error."
+        );
+        console.log(
+          "Raw body:",
+          req.rawBody?.substring(0, 100) || "Not available"
+        );
+        return res.status(400).send("Invalid JSON payload");
       }
-      
+
       // Only log webhook event details if debug mode is enabled
-      if (process.env.DEBUG_WEBHOOKS === 'true') {
-        const eventType = req.body.type || 'Unknown';
-        const eventAction = req.body.action || 'Unknown';
-        console.log('Received webhook event:', eventType, eventAction);
-        
+      if (process.env.DEBUG_WEBHOOKS === "true") {
+        const eventType = req.body.type || "Unknown";
+        const eventAction = req.body.action || "Unknown";
+        console.log("Received webhook event:", eventType, eventAction);
+
         // Log selected headers for debugging
         const relevantHeaders = {
-          'linear-event': req.headers['linear-event'],
-          'linear-signature': req.headers['linear-signature'],
-          'linear-delivery': req.headers['linear-delivery']
+          "linear-event": req.headers["linear-event"],
+          "linear-signature": req.headers["linear-signature"],
+          "linear-delivery": req.headers["linear-delivery"],
         };
-        console.log('Linear headers:', relevantHeaders);
+        console.log("Linear headers:", relevantHeaders);
       }
-      
+
       // Verify webhook signature
       if (!this.verifySignature(req)) {
-        console.error('Invalid webhook signature');
+        console.error("Invalid webhook signature");
         // For debugging, we'll accept the webhook even if signature validation fails
-        console.log('WARNING: Accepting webhook despite invalid signature for debugging');
+        console.log(
+          "WARNING: Accepting webhook despite invalid signature for debugging"
+        );
         // return res.status(401).send('Invalid signature');
       }
-      
+
       // Only log full payload in debug mode
-      if (process.env.DEBUG_WEBHOOKS === 'true') {
-        console.log('===== WEBHOOK PAYLOAD =====');
+      if (process.env.DEBUG_WEBHOOKS === "true") {
+        console.log("===== WEBHOOK PAYLOAD =====");
         console.log(JSON.stringify(req.body, null, 2));
-        console.log('===== END WEBHOOK PAYLOAD =====');
+        console.log("===== END WEBHOOK PAYLOAD =====");
       }
-      
+
       // Check if this is an Agent notification webhook (new "Inbox notifications" type)
       const isAgentNotification = req.body.type === "AppUserNotification";
-      
+
       try {
         if (isAgentNotification) {
           // Only log detailed webhook info in debug mode
-          if (process.env.DEBUG_WEBHOOKS === 'true') {
-            console.log('Received Agent notification webhook');
+          if (process.env.DEBUG_WEBHOOKS === "true") {
+            console.log("Received Agent notification webhook");
           }
-          
+
           // Validate the agent notification webhook payload against the schema
-          const validationResult = AgentNotificationWebhookSchema.safeParse(req.body);
-          
+          const validationResult = AgentNotificationWebhookSchema.safeParse(
+            req.body
+          );
+
           if (!validationResult.success) {
-            console.error('Agent notification webhook validation failed:');
-            console.error(validationResult.error.format());
-            return res.status(400).send('Invalid webhook payload format');
+            console.error("Agent notification webhook validation failed:");
+            console.dir(validationResult.error.format(), { depth: null });
+            return res.status(400).send("Invalid webhook payload format");
           }
-          
+
           const validatedPayload = validationResult.data;
           const action = validatedPayload.action;
           const notificationData = validatedPayload.notification;
-          
+
           // Only log notification details if not from the agent itself
           // Quick check to avoid unnecessary logging
           const agentUserId = this.issueService.userId;
-          const isFromAgent = (notificationData.actor?.id === agentUserId) || 
-                             (notificationData.comment?.userId === agentUserId);
-          
-          if (!isFromAgent && process.env.DEBUG_WEBHOOKS === 'true') {
-            const issueIdentifier = notificationData.issue?.identifier || 'unknown';
-            const actor = notificationData.actor?.name || 'unknown';
-            console.log(`Agent notification: ${action} from ${actor} on issue ${issueIdentifier}`);
+          const isFromAgent =
+            notificationData.actor?.id === agentUserId ||
+            notificationData.comment?.userId === agentUserId;
+
+          if (!isFromAgent && process.env.DEBUG_WEBHOOKS === "true") {
+            const issueIdentifier =
+              notificationData.issue?.identifier || "unknown";
+            const actor = notificationData.actor?.name || "unknown";
+            console.log(
+              `Agent notification: ${action} from ${actor} on issue ${issueIdentifier}`
+            );
           }
-          
+
           // Process the agent notification asynchronously
-          this.processAgentNotification(action, notificationData).catch(error => {
-            console.error('Error processing agent notification:', error);
-          });
+          this.processAgentNotification(action, notificationData).catch(
+            (error) => {
+              console.error("Error processing agent notification:", error);
+            }
+          );
         } else {
           // Process legacy webhook event
-          const type = req.body.type || 'unknown';
-          const action = req.body.action || 'unknown';
-          
+          const type = req.body.type || "unknown";
+          const action = req.body.action || "unknown";
+
           // Validate against the appropriate schema based on type
           let validatedData;
-          
-          if (type === 'Comment') {
+
+          if (type === "Comment") {
             const validationResult = CommentWebhookSchema.safeParse(req.body);
             if (validationResult.success) {
               validatedData = validationResult.data.data;
             } else {
-              console.error('Comment webhook validation failed:');
-              console.error(validationResult.error.format());
+              console.error("Comment webhook validation failed:");
+              console.dir(validationResult.error.format(), { depth: null });
             }
-          } else if (type === 'Issue') {
+          } else if (type === "Issue") {
             const validationResult = IssueWebhookSchema.safeParse(req.body);
             if (validationResult.success) {
               validatedData = validationResult.data.data;
             } else {
-              console.error('Issue webhook validation failed:');
-              console.error(validationResult.error.format());
+              console.error("Issue webhook validation failed:");
+              console.dir(validationResult.error.format(), { depth: null });
             }
           }
-          
+
           // If validation failed, fall back to the raw data (for backwards compatibility)
           const data = validatedData || req.body.data || {};
-          
+
           console.log(`Processing legacy webhook: ${type}/${action}`);
-          
+
           // Process the event asynchronously
-          this.processEvent(type, action, data).catch(error => {
-            console.error('Error processing webhook event:', error);
+          this.processEvent(type, action, data).catch((error) => {
+            console.error("Error processing webhook event:", error);
           });
         }
       } catch (error) {
-        console.error('Error processing webhook payload:', error);
+        console.error("Error processing webhook payload:", error);
       }
-      
+
       // Respond immediately to acknowledge receipt (recommended practice)
-      res.status(200).send('Event received');
+      res.status(200).send("Event received");
     });
-    
+
     // Health check endpoint
-    app.get('/health', (req, res) => {
-      res.status(200).send('Webhook server is running');
+    app.get("/health", (req, res) => {
+      res.status(200).send("Webhook server is running");
     });
-    
+
     // Add OAuth endpoints if oauthHelper is available
     if (this.oauthHelper) {
       // Add a dashboard that shows authentication status and provides helpful links
-      app.get('/', async (req, res) => {
+      app.get("/", async (req, res) => {
         try {
           const authStatus = await this.oauthHelper.hasValidToken();
           const linearClientStatus = this.issueService.getAuthStatus();
-          
+
           let html = `
             <!DOCTYPE html>
             <html>
@@ -481,7 +549,7 @@ export class ExpressWebhookService extends WebhookService {
               <body>
                 <h1>Linear Claude Agent Dashboard</h1>
           `;
-          
+
           // Authentication status box
           if (authStatus && linearClientStatus) {
             html += `
@@ -515,58 +583,64 @@ export class ExpressWebhookService extends WebhookService {
               </div>
             `;
           }
-          
+
           // Add webhook information
           html += `
             <h2>Webhook Information</h2>
             <p>For the Linear Agent API to work, you need to set up a webhook in Linear pointing to this server.</p>
             <div class="code">
-              <p>Webhook URL: <strong>${req.protocol}://${req.get('host')}/webhook</strong></p>
+              <p>Webhook URL: <strong>${req.protocol}://${req.get(
+            "host"
+          )}/webhook</strong></p>
               <p>Resource Types: Comments, Issues</p>
               <p>For Agent API: Enable "App User Notification" events</p>
             </div>
           `;
-          
+
           html += `
               </body>
             </html>
           `;
-          
+
           res.send(html);
         } catch (error) {
-          console.error('Error rendering dashboard:', error);
-          res.status(500).send('Error rendering dashboard: ' + error.message);
+          console.error("Error rendering dashboard:", error);
+          res.status(500).send("Error rendering dashboard: " + error.message);
         }
       });
-      
+
       // OAuth authorization endpoint - redirects to Linear
-      app.get('/oauth/authorize', (req, res) => {
+      app.get("/oauth/authorize", (req, res) => {
         try {
           const authUrl = this.oauthHelper.generateAuthorizationUrl();
-          console.log(`Redirecting to Linear OAuth authorization URL: ${authUrl}`);
+          console.log(
+            `Redirecting to Linear OAuth authorization URL: ${authUrl}`
+          );
           res.redirect(authUrl);
         } catch (error) {
-          console.error('Error generating OAuth URL:', error);
-          res.status(500).send('Error setting up OAuth flow');
+          console.error("Error generating OAuth URL:", error);
+          res.status(500).send("Error setting up OAuth flow");
         }
       });
-      
+
       // OAuth callback endpoint - handle the code from Linear
-      app.get('/oauth/callback', async (req, res) => {
+      app.get("/oauth/callback", async (req, res) => {
         try {
           const { code, state } = req.query;
-          
+
           if (!code) {
-            return res.status(400).send('Authorization code missing');
+            return res.status(400).send("Authorization code missing");
           }
-          
-          console.log(`Received OAuth callback with code: ${code.substring(0, 5)}...`);
-          
+
+          console.log(
+            `Received OAuth callback with code: ${code.substring(0, 5)}...`
+          );
+
           // Process the OAuth callback
           const tokenInfo = await this.oauthHelper.handleCallback(code, state);
-          
-          console.log('OAuth flow completed successfully');
-          
+
+          console.log("OAuth flow completed successfully");
+
           // HTML response with auto-redirect to dashboard
           const html = `
             <!DOCTYPE html>
@@ -589,21 +663,30 @@ export class ExpressWebhookService extends WebhookService {
               </body>
             </html>
           `;
-          
+
           res.status(200).send(html);
-          
+
           // Try to initialize the Linear client and fetch issues now
-          console.log('Authentication successful! The agent will now attempt to use the new token.');
+          console.log(
+            "Authentication successful! The agent will now attempt to use the new token."
+          );
           try {
             // Attempt to fetch assigned issues to verify the token works and update auth status
             await this.issueService.fetchAssignedIssues();
-            console.log('✅ Successfully initialized Linear client with new token!');
+            console.log(
+              "✅ Successfully initialized Linear client with new token!"
+            );
           } catch (initError) {
-            console.error('Error initializing Linear client with new token:', initError);
-            console.log('You may need to restart the application for the token to take effect.');
+            console.error(
+              "Error initializing Linear client with new token:",
+              initError
+            );
+            console.log(
+              "You may need to restart the application for the token to take effect."
+            );
           }
         } catch (error) {
-          console.error('Error handling OAuth callback:', error);
+          console.error("Error handling OAuth callback:", error);
           const errorHtml = `
             <!DOCTYPE html>
             <html>
@@ -628,52 +711,54 @@ export class ExpressWebhookService extends WebhookService {
           res.status(500).send(errorHtml);
         }
       });
-      
+
       // OAuth reset endpoint - clear tokens and redirect to authorization
-      app.get('/oauth/reset', async (req, res) => {
+      app.get("/oauth/reset", async (req, res) => {
         try {
-          console.log('Resetting OAuth tokens and starting new authorization flow');
-          
+          console.log(
+            "Resetting OAuth tokens and starting new authorization flow"
+          );
+
           // Clear existing tokens
           await this.oauthHelper.clearTokens();
-          
+
           // Redirect to the authorization endpoint
-          res.redirect('/oauth/authorize');
+          res.redirect("/oauth/authorize");
         } catch (error) {
-          console.error('Error resetting OAuth:', error);
-          res.status(500).send('Error resetting OAuth: ' + error.message);
+          console.error("Error resetting OAuth:", error);
+          res.status(500).send("Error resetting OAuth: " + error.message);
         }
       });
-      
+
       // OAuth status endpoint - check if we have valid tokens
-      app.get('/oauth/status', async (req, res) => {
+      app.get("/oauth/status", async (req, res) => {
         try {
           const hasValidToken = await this.oauthHelper.hasValidToken();
           res.json({
             authenticated: hasValidToken,
-            authType: hasValidToken ? 'oauth' : 'none'
+            authType: hasValidToken ? "oauth" : "none",
           });
         } catch (error) {
-          console.error('Error checking OAuth status:', error);
+          console.error("Error checking OAuth status:", error);
           res.status(500).json({
             authenticated: false,
-            error: error.message
+            error: error.message,
           });
         }
       });
     }
-    
+
     // Start the server
     try {
       this.server = await this.httpServer.listen(app, port);
       console.log(`Webhook server listening on port ${port}`);
       return this.server;
     } catch (error) {
-      console.error('Failed to start webhook server:', error);
+      console.error("Failed to start webhook server:", error);
       throw error;
     }
   }
-  
+
   /**
    * Close the server
    * @returns {Promise<void>}
@@ -681,10 +766,10 @@ export class ExpressWebhookService extends WebhookService {
   async closeServer() {
     try {
       await this.httpServer.close(this.server);
-      console.log('Webhook server closed');
+      console.log("Webhook server closed");
       this.server = null;
     } catch (error) {
-      console.error('Error closing webhook server:', error);
+      console.error("Error closing webhook server:", error);
     }
   }
 }

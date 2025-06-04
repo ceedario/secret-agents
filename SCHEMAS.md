@@ -235,7 +235,8 @@ if (validationResult.success) {
   const validatedPayload = validationResult.data;
   // Process the validated payload
 } else {
-  console.error("Validation failed:", validationResult.error.format());
+  console.error("Validation failed:");
+  console.dir(validationResult.error.format(), { depth: null });
 }
 ```
 
