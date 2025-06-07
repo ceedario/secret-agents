@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Hello World markdown file (hello-world.md) for testing purposes
+
 ### Fixed
 - Streaming updates posting to wrong comment on subsequent interactions
   - Fixed session management bug where new streaming comment ID wasn't being passed to Claude process handlers
