@@ -151,7 +151,7 @@ export async function setupEdgeWorker(mainWindow: BrowserWindow) {
       await edgeWorker.start()
       
       // Store reference for cleanup
-      (global as any).edgeWorker = edgeWorker
+      (global as any).edgeWorker = edgeWorker;
       
       return { success: true }
     } catch (error) {

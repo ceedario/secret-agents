@@ -3,69 +3,69 @@
  */
 
 export interface EdgeEvent {
-  id: string
-  type: 'connection' | 'heartbeat' | 'webhook' | 'error'
-  timestamp: string
-  data?: any
+  id: string;
+  type: 'connection' | 'heartbeat' | 'webhook' | 'error';
+  timestamp: string;
+  data?: any;
 }
 
 export interface ConnectionEvent extends EdgeEvent {
-  type: 'connection'
+  type: 'connection';
   data: {
-    message: string
-    edge_id?: string
-  }
+    message: string;
+    edge_id?: string;
+  };
 }
 
 export interface HeartbeatEvent extends EdgeEvent {
-  type: 'heartbeat'
+  type: 'heartbeat';
 }
 
 export interface WebhookEvent extends EdgeEvent {
-  type: 'webhook'
+  type: 'webhook';
   data: {
-    type: string
-    action?: string
-    createdAt: string
-    data?: any
-    notification?: any
-    issue?: any
-    comment?: any
-    [key: string]: any
-  }
+    type: string;
+    action?: string;
+    createdAt: string;
+    data?: any;
+    notification?: any;
+    issue?: any;
+    comment?: any;
+    [key: string]: any;
+  };
 }
 
 export interface ErrorEvent extends EdgeEvent {
-  type: 'error'
+  type: 'error';
   data: {
-    message: string
-    code?: string
-  }
+    message: string;
+    code?: string;
+  };
 }
 
 export interface StatusUpdate {
-  eventId: string
-  status: 'processing' | 'completed' | 'failed'
-  error?: string
-  metadata?: Record<string, any>
+  eventId: string;
+  status: 'processing' | 'completed' | 'failed';
+  error?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface NdjsonClientConfig {
-  proxyUrl: string
-  token: string
-  maxReconnectAttempts?: number
-  reconnectBaseDelay?: number
-  onEvent?: (event: EdgeEvent) => void
-  onConnect?: () => void
-  onDisconnect?: (reason?: string) => void
-  onError?: (error: Error) => void
+  proxyUrl: string;
+  token: string;
+  maxReconnectAttempts?: number;
+  reconnectBaseDelay?: number;
+  onEvent?: (event: EdgeEvent) => void;
+  onConnect?: () => void;
+  onDisconnect?: (reason?: string) => void;
+  onError?: (error: Error) => void;
 }
 
 export interface NdjsonClientEvents {
-  'connect': () => void
-  'disconnect': (reason?: string) => void
-  'event': (event: EdgeEvent) => void
-  'webhook': (data: WebhookEvent['data']) => void
-  'heartbeat': () => void
-  'error': (error: Error) => void
+  connect: () => void;
+  disconnect: (reason?: string) => void;
+  event: (event: EdgeEvent) => void;
+  webhook: (data: WebhookEvent['data']) => void;
+  heartbeat: () => void;
+  error: (error: Error) => void;
 }

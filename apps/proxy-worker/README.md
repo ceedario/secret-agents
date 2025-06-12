@@ -89,6 +89,7 @@ pnpm run deploy
 ### Webhook Configuration
 
 Configure your Linear webhook URL to:
+
 ```
 https://your-worker.workers.dev/webhook
 ```
@@ -96,12 +97,13 @@ https://your-worker.workers.dev/webhook
 ### Edge Worker Connection
 
 Edge workers connect using:
+
 ```javascript
 const response = await fetch('https://your-worker.workers.dev/events/stream', {
   headers: {
-    'Authorization': `Bearer ${EDGE_TOKEN}`
-  }
-})
+    Authorization: `Bearer ${EDGE_TOKEN}`,
+  },
+});
 ```
 
 ## Security
@@ -114,26 +116,35 @@ const response = await fetch('https://your-worker.workers.dev/events/stream', {
 ## API Endpoints
 
 ### `GET /`
+
 Dashboard showing available endpoints
 
 ### `GET /oauth/authorize`
+
 Starts OAuth flow with Linear
 
 ### `GET /oauth/callback`
+
 OAuth callback endpoint - handles code exchange
 
 ### `POST /webhook`
+
 Receives Linear webhooks
+
 - Requires `Linear-Signature` header
 - Validates HMAC signature
 
 ### `GET /events/stream`
+
 NDJSON event stream for edge workers
+
 - Requires `Authorization: Bearer <edge_token>`
 - Uses Durable Objects for persistent connections
 
 ### `POST /events/status`
+
 Status updates from edge workers
+
 - Requires `Authorization: Bearer <edge_token>`
 
 ## Development
@@ -155,6 +166,7 @@ pnpm run typecheck
 ### Monitoring
 
 View real-time logs:
+
 ```bash
 pnpm run tail
 ```
@@ -169,6 +181,7 @@ pnpm run tail
 ## Migration from Express
 
 This implementation provides the same functionality as the Express proxy server but with:
+
 - No filesystem dependencies (uses KV)
 - Better scalability (runs globally)
 - Lower latency (edge deployment)
@@ -178,21 +191,25 @@ This implementation provides the same functionality as the Express proxy server 
 ## Troubleshooting
 
 ### KV Operations Failing
+
 - Check namespace bindings in `wrangler.toml`
 - Verify secrets are set correctly
 - Check KV operation limits
 
 ### Durable Objects Not Working
+
 - Ensure migrations are applied
 - Check Durable Object bindings
 - Verify class export in `index.ts`
 
 ### OAuth Failing
+
 - Verify Linear app redirect URI matches worker URL
 - Check CLIENT_ID and CLIENT_SECRET
 - Ensure ENCRYPTION_KEY is 32 characters
 
 ### Webhook Signature Failing
+
 - Verify LINEAR_WEBHOOK_SECRET matches Linear config
 - Check request body handling
 - Ensure signature header is present

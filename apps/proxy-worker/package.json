@@ -10,6 +10,8 @@
     "preview": "wrangler preview",
     "tail": "wrangler tail",
     "format": "prettier --write .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -17,6 +19,8 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240117.0",
+    "@cyrus/eslint-config": "workspace:*",
+    "eslint": "^9.25.0",
     "prettier": "^3.2.4",
     "typescript": "^5.3.3",
     "wrangler": "^3.23.0"

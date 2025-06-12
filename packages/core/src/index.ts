@@ -1,3 +1,3 @@
-export { Session } from './Session.js'
-export type { SessionOptions, Issue, Workspace, NarrativeItem } from './Session.js'
-export { SessionManager } from './SessionManager.js'
+export type { Issue, NarrativeItem, SessionOptions, Workspace } from './Session.js';
+export { Session } from './Session.js';
+export { SessionManager } from './SessionManager.js';

@@ -1,11 +1,11 @@
-export { NdjsonClient } from './NdjsonClient.js'
+export { NdjsonClient } from './NdjsonClient.js';
 export type {
-  EdgeEvent,
   ConnectionEvent,
-  HeartbeatEvent,
-  WebhookEvent,
+  EdgeEvent,
   ErrorEvent,
-  StatusUpdate,
+  HeartbeatEvent,
   NdjsonClientConfig,
-  NdjsonClientEvents
-} from './types.js'
+  NdjsonClientEvents,
+  StatusUpdate,
+  WebhookEvent,
+} from './types.js';

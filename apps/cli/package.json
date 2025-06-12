@@ -11,7 +11,10 @@
     "start": "node app.mjs",
     "dev": "nodemon app.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@linear/sdk": "^39.0.0",
@@ -29,8 +32,11 @@
     "zod": "^3.24.4"
   },
   "devDependencies": {
+    "@cyrus/eslint-config": "workspace:*",
     "@vitest/ui": "^3.1.4",
+    "eslint": "^9.25.0",
     "nodemon": "^2.0.22",
+    "prettier": "^3.2.4",
     "vitest": "^3.1.4"
   }
 }

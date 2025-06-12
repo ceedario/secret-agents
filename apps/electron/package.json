@@ -10,6 +10,7 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "build:all": "npm run build:electron && npm run build:renderer && electron-builder",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "electron": "npm run build:electron && electron .",
     "electron:dev": "concurrently \"npm run dev\" \"npm run build:electron && wait-on http://localhost:5173 && cross-env ELECTRON_RENDERER_URL=http://localhost:5173 electron .\"",
@@ -38,8 +39,8 @@
     "tailwindcss": "^4.1.8"
   },
   "devDependencies": {
+    "@cyrus/eslint-config": "workspace:*",
     "@electron-toolkit/utils": "^4.0.0",
-    "@eslint/js": "^9.25.0",
     "@tailwindcss/postcss": "^4.1.8",
     "@types/node": "^22.15.29",
     "@types/react": "^19.1.2",
@@ -55,9 +56,9 @@
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
     "postcss": "^8.5.4",
+    "prettier": "^3.2.4",
     "tw-animate-css": "^1.3.4",
     "typescript": "~5.8.3",
-    "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5",
     "wait-on": "^8.0.3"
   },

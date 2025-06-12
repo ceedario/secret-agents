@@ -1,5 +1,5 @@
-import { vi } from 'vitest'
-import type { ClaudeEvent } from '@cyrus/claude-parser'
+import { vi } from 'vitest';
+import type { ClaudeEvent } from '@cyrus/claude-parser';
 
 // Mock console methods to reduce noise in tests
 global.console = {
@@ -8,8 +8,8 @@ global.console = {
   debug: vi.fn(),
   info: vi.fn(),
   warn: vi.fn(),
-  error: vi.fn()
-}
+  error: vi.fn(),
+};
 
 // Mock webhook event helpers
 export const mockIssueAssignedWebhook = (issue: any = {}) => ({
@@ -26,14 +26,14 @@ export const mockIssueAssignedWebhook = (issue: any = {}) => ({
         title: 'Test Issue',
         description: 'Test description',
         team: { id: 'test-workspace' },
-        ...issue
-      }
+        ...issue,
+      },
     },
     createdAt: new Date().toISOString(),
     eventId: 'event-123',
-    organizationId: 'test-workspace'
-  }
-})
+    organizationId: 'test-workspace',
+  },
+});
 
 export const mockCommentWebhook = (issue: any = {}, comment: any = {}) => ({
   type: 'webhook',
@@ -47,18 +47,18 @@ export const mockCommentWebhook = (issue: any = {}, comment: any = {}) => ({
         id: 'issue-123',
         identifier: 'TEST-123',
         team: { id: 'test-workspace' },
-        ...issue
+        ...issue,
       },
       comment: {
         body: 'Test comment',
-        ...comment
-      }
+        ...comment,
+      },
     },
     createdAt: new Date().toISOString(),
     eventId: 'event-456',
-    organizationId: 'test-workspace'
-  }
-})
+    organizationId: 'test-workspace',
+  },
+});
 
 export const mockLegacyCommentWebhook = (issue: any = {}, comment: any = {}) => ({
   type: 'webhook',
@@ -72,40 +72,45 @@ export const mockLegacyCommentWebhook = (issue: any = {}, comment: any = {}) => 
         id: 'issue-123',
         identifier: 'TEST-123',
         team: { id: 'test-workspace' },
-        ...issue
+        ...issue,
       },
       body: 'Test comment',
-      ...comment
+      ...comment,
     },
     createdAt: new Date().toISOString(),
-    eventId: 'event-789'
-  }
-})
+    eventId: 'event-789',
+  },
+});
 
-export const mockClaudeAssistantEvent = (content: string): ClaudeEvent => ({
-  type: 'assistant',
-  message: {
-    content: content
-  }
-} as any)
+export const mockClaudeAssistantEvent = (content: string): ClaudeEvent =>
+  ({
+    type: 'assistant',
+    message: {
+      content: content,
+    },
+  }) as any;
 
-export const mockClaudeToolEvent = (toolName: string, input: any): ClaudeEvent => ({
-  type: 'assistant',
-  message: {
-    content: [{
-      type: 'tool_use',
-      name: toolName,
-      input
-    }]
-  }
-} as any)
+export const mockClaudeToolEvent = (toolName: string, input: any): ClaudeEvent =>
+  ({
+    type: 'assistant',
+    message: {
+      content: [
+        {
+          type: 'tool_use',
+          name: toolName,
+          input,
+        },
+      ],
+    },
+  }) as any;
 
-export const mockClaudeErrorEvent = (message: string): ClaudeEvent => ({
-  type: 'error',
-  message
-} as any)
+export const mockClaudeErrorEvent = (message: string): ClaudeEvent =>
+  ({
+    type: 'error',
+    message,
+  }) as any;
 
 // Reset all mocks after each test
 afterEach(() => {
-  vi.clearAllMocks()
-})
+  vi.clearAllMocks();
+});

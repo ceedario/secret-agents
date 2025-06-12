@@ -5,6 +5,7 @@ A TypeScript parser for Claude's stdout JSON messages, designed to work with str
 ## Overview
 
 This package provides a robust parser for processing Claude's JSON output, handling:
+
 - Streaming JSON parsing with line buffering
 - All Claude message types (assistant, user, system, tool, error, etc.)
 - Token limit detection and handling
@@ -13,6 +14,7 @@ This package provides a robust parser for processing Claude's JSON output, handl
 ## Important: jq Requirement
 
 This parser is designed to work with Claude's output that has been processed through `jq -c .`. The `jq` command:
+
 - Ensures valid JSON formatting
 - Compacts output to one JSON object per line
 - Handles any malformed JSON gracefully
@@ -36,57 +38,57 @@ pnpm add @cyrus/claude-parser
 ### Basic Stream Processing
 
 ```typescript
-import { StreamProcessor } from '@cyrus/claude-parser'
+import { StreamProcessor } from '@cyrus/claude-parser';
 
 // Create a stream processor
 const processor = new StreamProcessor({
-  sessionId: 'optional-session-id'
-})
+  sessionId: 'optional-session-id',
+});
 
 // Pipe Claude's stdout through jq to the processor
-claudeProcess.stdout.pipe(processor)
+claudeProcess.stdout.pipe(processor);
 
 // Handle parsed events
 processor.on('data', (event) => {
-  console.log('Parsed event:', event)
-})
+  console.log('Parsed event:', event);
+});
 
 processor.on('error', (error) => {
-  console.error('Parse error:', error)
-})
+  console.error('Parse error:', error);
+});
 ```
 
 ### Direct Parser Usage
 
 ```typescript
-import { StdoutParser } from '@cyrus/claude-parser'
+import { StdoutParser } from '@cyrus/claude-parser';
 
 const parser = new StdoutParser({
-  sessionId: 'optional-session-id'
-})
+  sessionId: 'optional-session-id',
+});
 
 // Listen for specific events
 parser.on('assistant', (event) => {
-  console.log('Assistant message:', event.message)
-})
+  console.log('Assistant message:', event.message);
+});
 
 parser.on('tool-use', (toolName, input) => {
-  console.log(`Tool ${toolName} called with:`, input)
-})
+  console.log(`Tool ${toolName} called with:`, input);
+});
 
 parser.on('text', (text) => {
-  console.log('Text content:', text)
-})
+  console.log('Text content:', text);
+});
 
 parser.on('error', (error) => {
-  console.error('Error:', error)
-})
+  console.error('Error:', error);
+});
 
 // Process data chunks
-parser.processData(chunk)
+parser.processData(chunk);
 
 // When done
-parser.processEnd()
+parser.processEnd();
 ```
 
 ## Event Types
@@ -117,7 +119,7 @@ import type {
   ToolUseContent,
   ErrorEvent,
   // ... and more
-} from '@cyrus/claude-parser'
+} from '@cyrus/claude-parser';
 ```
 
 ## Development

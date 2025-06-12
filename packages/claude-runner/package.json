@@ -13,13 +13,19 @@
     "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@cyrus/claude-parser": "workspace:*"
   },
   "devDependencies": {
+    "@cyrus/eslint-config": "workspace:*",
     "@types/node": "^20.0.0",
+    "eslint": "^9.25.0",
+    "prettier": "^3.2.4",
     "typescript": "^5.3.3",
     "vitest": "^1.1.0"
   },

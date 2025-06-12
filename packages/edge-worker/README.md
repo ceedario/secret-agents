@@ -11,6 +11,7 @@ pnpm add @cyrus/edge-worker
 ## Usage
 
 The EdgeWorker supports multiple repository/Linear workspace pairs. Each repository configuration includes:
+
 - Git repository path and branch
 - Linear workspace ID and OAuth token
 - Workspace directory for issue processing
@@ -18,27 +19,29 @@ The EdgeWorker supports multiple repository/Linear workspace pairs. Each reposit
 ### Single Repository Example (CLI)
 
 ```typescript
-import { EdgeWorker } from '@cyrus/edge-worker'
+import { EdgeWorker } from '@cyrus/edge-worker';
 
 const edgeWorker = new EdgeWorker({
   // Connection
   proxyUrl: 'https://edge-proxy.example.com',
-  
+
   // Claude
   claudePath: '/usr/local/bin/claude',
   defaultAllowedTools: ['bash', 'edit', 'read'],
-  
+
   // Single repository configuration
-  repositories: [{
-    id: 'main-repo',
-    name: 'Main Repository',
-    repositoryPath: '/home/user/projects/main',
-    baseBranch: 'main',
-    linearWorkspaceId: 'workspace-123',
-    linearToken: await oauthHelper.getAccessToken(),
-    workspaceBaseDir: '/home/user/.cyrus/workspaces/main'
-  }],
-  
+  repositories: [
+    {
+      id: 'main-repo',
+      name: 'Main Repository',
+      repositoryPath: '/home/user/projects/main',
+      baseBranch: 'main',
+      linearWorkspaceId: 'workspace-123',
+      linearToken: await oauthHelper.getAccessToken(),
+      workspaceBaseDir: '/home/user/.cyrus/workspaces/main',
+    },
+  ],
+
   // Optional handlers
   handlers: {
     // Custom workspace creation (e.g., git worktrees)
@@ -47,34 +50,34 @@ const edgeWorker = new EdgeWorker({
         repository.repositoryPath,
         issue.identifier,
         repository.baseBranch
-      )
-      return { path, isGitWorktree: true }
+      );
+      return { path, isGitWorktree: true };
     },
-    
+
     // Log errors
     onError: (error) => {
-      console.error('EdgeWorker error:', error)
-    }
+      console.error('EdgeWorker error:', error);
+    },
   },
-  
+
   // Features
   features: {
     enableContinuation: true,
-    enableTokenLimitHandling: true
-  }
-})
+    enableTokenLimitHandling: true,
+  },
+});
 
 // Start processing
-await edgeWorker.start()
+await edgeWorker.start();
 ```
 
 ### Multi-Repository Example (Electron)
 
 ```typescript
-import { EdgeWorker } from '@cyrus/edge-worker'
+import { EdgeWorker } from '@cyrus/edge-worker';
 
 // Load repository configurations from user settings
-const repositories = userSettings.repositories.map(repo => ({
+const repositories = userSettings.repositories.map((repo) => ({
   id: repo.id,
   name: repo.name,
   repositoryPath: repo.path,
@@ -82,49 +85,49 @@ const repositories = userSettings.repositories.map(repo => ({
   linearWorkspaceId: repo.linearWorkspaceId,
   linearToken: repo.linearToken, // Each repo can have its own token
   workspaceBaseDir: path.join(app.getPath('userData'), 'workspaces', repo.id),
-  isActive: repo.enabled
-}))
+  isActive: repo.enabled,
+}));
 
 const edgeWorker = new EdgeWorker({
   proxyUrl: config.proxyUrl,
   claudePath: getClaudePath(),
-  
+
   // Multiple repositories
   repositories,
-  
+
   // UI updates with repository context
   handlers: {
     onClaudeEvent: (issueId, event, repositoryId) => {
       // Update UI with Claude's progress
-      mainWindow.webContents.send('claude-event', { 
-        issueId, 
+      mainWindow.webContents.send('claude-event', {
+        issueId,
         event,
-        repository: repositories.find(r => r.id === repositoryId)
-      })
+        repository: repositories.find((r) => r.id === repositoryId),
+      });
     },
-    
+
     onSessionStart: (issueId, issue, repositoryId) => {
-      const repo = repositories.find(r => r.id === repositoryId)
+      const repo = repositories.find((r) => r.id === repositoryId);
       // Show notification
       new Notification({
         title: `Processing Issue in ${repo.name}`,
-        body: `Working on ${issue.identifier}: ${issue.title}`
-      }).show()
+        body: `Working on ${issue.identifier}: ${issue.title}`,
+      }).show();
     },
-    
+
     createWorkspace: async (issue, repository) => {
       // Create git worktree for the specific repository
       const worktreePath = await createWorktree(
         repository.repositoryPath,
         issue.identifier,
         repository.baseBranch
-      )
-      return { path: worktreePath, isGitWorktree: true }
-    }
-  }
-})
+      );
+      return { path: worktreePath, isGitWorktree: true };
+    },
+  },
+});
 
-await edgeWorker.start()
+await edgeWorker.start();
 ```
 
 ## Configuration
@@ -148,6 +151,7 @@ Each repository in the `repositories` array requires:
 - `workspaceBaseDir`: Where to create issue workspaces
 
 Optional per-repository settings:
+
 - `isActive`: Whether to process webhooks (default: true)
 - `promptTemplatePath`: Custom prompt template for this repo
 
@@ -188,7 +192,7 @@ Your App (CLI/Electron)
 EdgeWorker
     ↓ manages multiple repositories
     ├─→ Repository 1 (token A) ─→ Linear Workspace 1
-    ├─→ Repository 2 (token A) ─→ Linear Workspace 1  
+    ├─→ Repository 2 (token A) ─→ Linear Workspace 1
     └─→ Repository 3 (token B) ─→ Linear Workspace 2
     ↓ connects to proxy (grouped by token)
 Edge Proxy
@@ -197,6 +201,7 @@ Linear
 ```
 
 Key features:
+
 - Multiple repositories can share the same Linear workspace/token
 - Repositories with different tokens connect separately to minimize connections
 - Each repository has its own workspace directory and configuration
@@ -209,12 +214,14 @@ The EdgeWorker supports customizable prompt templates to tailor Claude's behavio
 ### Default Template
 
 If no custom template is specified, EdgeWorker uses a built-in template that helps Claude determine whether to:
+
 1. **Execute** - When requirements are clear, implement the solution
 2. **Clarify** - When requirements are vague, ask clarifying questions
 
 ### Custom Templates
 
 You can provide custom templates at two levels:
+
 - **Global**: Via `config.features.promptTemplatePath`
 - **Per-repository**: Via `repository.promptTemplatePath` (takes precedence)
 
@@ -241,22 +248,27 @@ Templates use Handlebars-style variables that are automatically replaced:
 You are an expert {{repository_name}} developer.
 
 ## Current Task
+
 **Issue**: {{issue_title}} (#{{issue_id}})
 **Priority**: {{issue_priority}}
 **Status**: {{issue_state}}
 
 ## Description
+
 {{issue_description}}
 
 ## Previous Discussion
+
 {{comment_history}}
 
 ## Technical Context
+
 - Repository: {{repository_name}}
 - Working Directory: {{working_directory}}
 - Branch: {{branch_name}} (from {{base_branch}})
 
 ## Instructions
+
 1. Review the issue requirements carefully
 2. Check existing code patterns in the repository
 3. Implement a solution following project conventions
@@ -273,21 +285,25 @@ Remember to ask clarifying questions if requirements are unclear.
 const edgeWorker = new EdgeWorker({
   // ... other config
   features: {
-    promptTemplatePath: './prompts/default.md'
-  }
-})
+    promptTemplatePath: './prompts/default.md',
+  },
+});
 
 // Per-repository templates
 const edgeWorker = new EdgeWorker({
-  repositories: [{
-    id: 'frontend',
-    name: 'Frontend App',
-    // ... other config
-    promptTemplatePath: './prompts/frontend-specific.md'
-  }, {
-    id: 'backend', 
-    name: 'Backend API',
-    // ... other config
-    promptTemplatePath: './prompts/backend-specific.md'
-  }]
-})
+  repositories: [
+    {
+      id: 'frontend',
+      name: 'Frontend App',
+      // ... other config
+      promptTemplatePath: './prompts/frontend-specific.md',
+    },
+    {
+      id: 'backend',
+      name: 'Backend API',
+      // ... other config
+      promptTemplatePath: './prompts/backend-specific.md',
+    },
+  ],
+});
+```
