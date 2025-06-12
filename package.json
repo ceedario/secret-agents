@@ -13,9 +13,9 @@
     "test:packages:run": "pnpm --filter './packages/*' test:run",
     "test:apps": "pnpm --filter './apps/*' test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
-    "lint:fix": "pnpm -r lint:fix",
-    "format": "pnpm -r format"
+    "lint": "pnpm -r --if-present lint",
+    "lint:fix": "pnpm -r --if-present lint:fix",
+    "format": "pnpm -r --if-present format"
   },
   "keywords": [
     "linear",

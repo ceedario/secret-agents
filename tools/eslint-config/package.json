@@ -11,7 +11,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'Config package - no linting needed'",
+    "format": "echo 'Config package - no formatting needed'"
   },
   "dependencies": {
     "@eslint/compat": "^1.0.0",
