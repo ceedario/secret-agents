@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cyrus/claude-parser": "workspace:*"
+    "@anthropic-ai/claude-code": "^1.0.22"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

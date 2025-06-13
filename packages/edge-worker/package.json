@@ -19,7 +19,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cyrus/claude-parser": "workspace:*",
     "@cyrus/claude-runner": "workspace:*",
     "@cyrus/core": "workspace:*",
     "@cyrus/ndjson-client": "workspace:*",

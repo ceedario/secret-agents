@@ -11,5 +11,6 @@ export {
 export type {
   ClaudeRunnerConfig,
   ClaudeProcessInfo,
-  ClaudeRunnerEvents
+  ClaudeRunnerEvents,
+  ClaudeMessage
 } from './types.js'

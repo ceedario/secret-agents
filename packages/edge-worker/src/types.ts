@@ -1,5 +1,5 @@
 import type { Issue, Workspace } from '@cyrus/core'
-import type { ClaudeEvent } from '@cyrus/claude-parser'
+import type { ClaudeMessage } from '@cyrus/claude-runner'
 
 /**
  * Configuration for a single repository/workspace pair
@@ -48,7 +48,7 @@ export interface EdgeWorkerConfig {
     
     // Called with Claude events (for UI updates, logging, etc)
     // Now includes repository ID
-    onClaudeEvent?: (issueId: string, event: ClaudeEvent, repositoryId: string) => void
+    onClaudeEvent?: (issueId: string, event: ClaudeMessage, repositoryId: string) => void
     
     // Called when session starts/ends
     // Now includes repository ID
@@ -115,7 +115,7 @@ export interface EdgeWorkerEvents {
   'session:ended': (issueId: string, exitCode: number | null, repositoryId: string) => void
   
   // Claude events (now includes repository ID)
-  'claude:event': (issueId: string, event: ClaudeEvent, repositoryId: string) => void
+  'claude:event': (issueId: string, event: ClaudeMessage, repositoryId: string) => void
   'claude:response': (issueId: string, text: string, repositoryId: string) => void
   'claude:tool-use': (issueId: string, tool: string, input: any, repositoryId: string) => void
   

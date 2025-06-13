@@ -5,7 +5,7 @@ import { ClaudeRunner, getSafeTools } from '@cyrus/claude-runner'
 import { SessionManager, Session } from '@cyrus/core'
 import type { EdgeWorkerConfig, EdgeWorkerEvents, RepositoryConfig } from './types.js'
 import type { WebhookEvent, StatusUpdate } from '@cyrus/ndjson-client'
-import type { ClaudeEvent } from '@cyrus/claude-parser'
+import type { ClaudeMessage } from '@cyrus/claude-runner'
 import { readFile, writeFile, mkdir, rename, readdir } from 'fs/promises'
 import { resolve, dirname, join, basename, extname } from 'path'
 import { fileURLToPath } from 'url'
@@ -529,7 +529,7 @@ export class EdgeWorker extends EventEmitter {
   /**
    * Handle Claude events
    */
-  private async handleClaudeEvent(issueId: string, event: ClaudeEvent, repositoryId: string): Promise<void> {
+  private async handleClaudeEvent(issueId: string, event: ClaudeMessage, repositoryId: string): Promise<void> {
     // Emit generic event
     this.emit('claude:event', issueId, event, repositoryId)
     this.config.handlers?.onClaudeEvent?.(issueId, event, repositoryId)
