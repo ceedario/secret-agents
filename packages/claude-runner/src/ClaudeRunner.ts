@@ -26,9 +26,10 @@ export class ClaudeRunner extends EventEmitter {
     this.config = config
 
     // Forward config callbacks to events
-    if (config.onEvent) this.on('message', config.onEvent)
-    if (config.onError) this.on('error', config.onError)
-    if (config.onExit) this.on('exit', config.onExit)
+    if (config.onMessage) this.on('message', config.onMessage)
+    if (config.onSessionStart) this.on('session:start', config.onSessionStart)
+    if (config.onSessionEnd) this.on('session:end', config.onSessionEnd)
+    if (config.onSessionError) this.on('session:error', config.onSessionError)
   }
 
   /**
@@ -47,6 +48,9 @@ export class ClaudeRunner extends EventEmitter {
 
     // Set up logging
     this.setupLogging()
+
+    // Emit session start event
+    this.emit('session:start')
 
     return {
       process: null,
@@ -123,7 +127,8 @@ export class ClaudeRunner extends EventEmitter {
       this.handleSessionComplete()
     } catch (error) {
       console.error('[ClaudeRunner] SDK query error:', error)
-      this.emit('error', error instanceof Error ? error : new Error(String(error)))
+      const err = error instanceof Error ? error : new Error(String(error))
+      this.emit('session:error', err)
       this.handleSessionComplete()
     }
   }
@@ -162,65 +167,10 @@ export class ClaudeRunner extends EventEmitter {
       this.logStream.write(JSON.stringify(message) + '\n')
     }
     
-    // Emit generic message event
+    // Just re-emit the raw SDK message - no processing needed!
     this.emit('message', message)
-
-    // Process specific message types
-    this.processMessage(message)
   }
 
-  /**
-   * Process a message based on its type
-   */
-  private processMessage(message: ClaudeMessage): void {
-    switch (message.type) {
-      case 'assistant':
-        this.emit('assistant', message)
-        this.processAssistantMessage(message)
-        break
-      
-      case 'result':
-        this.emit('result', message)
-        // Handle result message
-        if ('result' in message) {
-          // This is a success result
-          this.emit('end-turn', message.result)
-        }
-        break
-      
-      case 'system':
-        // System initialization message
-        break
-        
-      default:
-        // Handle unknown message types
-        break
-    }
-  }
-
-  /**
-   * Process assistant messages
-   */
-  private processAssistantMessage(message: ClaudeMessage): void {
-    if (message.type !== 'assistant' || !message.message?.content) return
-
-    let currentText = ''
-
-    // Extract content from message
-    for (const content of message.message.content) {
-      if (content.type === 'text' && content.text) {
-        currentText += content.text
-        this.emit('text', content.text)
-      } else if (content.type === 'tool_use' && content.name && content.input) {
-        this.emit('tool-use', content.name, content.input)
-      }
-    }
-
-    // Check for end of turn
-    if (message.message.stop_reason === 'end_turn') {
-      this.emit('end-turn', currentText)
-    }
-  }
 
   /**
    * Handle session completion
@@ -235,8 +185,8 @@ export class ClaudeRunner extends EventEmitter {
       this.logStream = null
     }
 
-    // Emit exit event
-    this.emit('exit', 0)
+    // Emit session end event
+    this.emit('session:end', 0)
   }
 
   /**

@@ -15,9 +15,10 @@ export interface ClaudeRunnerConfig {
   // SDK options
   sdkOptions?: SDKOptions
   // Event callbacks
-  onEvent?: (event: ClaudeMessage) => void
-  onError?: (error: Error) => void
-  onExit?: (code: number | null) => void
+  onMessage?: (message: ClaudeMessage) => void
+  onSessionStart?: () => void
+  onSessionEnd?: (code: number | null) => void
+  onSessionError?: (error: Error) => void
 }
 
 export interface ClaudeProcessInfo {
@@ -27,13 +28,11 @@ export interface ClaudeProcessInfo {
 }
 
 export interface ClaudeRunnerEvents {
-  'message': (event: ClaudeMessage) => void
-  'assistant': (event: ClaudeMessage) => void
-  'tool-use': (toolName: string, input: any) => void
-  'text': (text: string) => void
-  'end-turn': (lastText: string) => void
-  'result': (event: ClaudeMessage) => void
-  'error': (error: Error) => void
-  'token-limit': () => void
-  'exit': (code: number | null) => void
+  // SDK message events - just re-emit the raw SDK messages
+  'message': (message: ClaudeMessage) => void
+  
+  // Session lifecycle events
+  'session:start': () => void
+  'session:end': (code: number | null) => void
+  'session:error': (error: Error) => void
 }

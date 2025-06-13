@@ -294,8 +294,9 @@ export class EdgeWorker extends EventEmitter {
       allowedTools: repository.allowedTools || this.config.defaultAllowedTools || getSafeTools(),
       allowedDirectories,
       workspaceName: issue.identifier,
-      onEvent: (event) => this.handleClaudeEvent(issue.id, event, repository.id),
-      onExit: (code) => this.handleClaudeExit(issue.id, code, repository.id)
+      onMessage: (message) => this.handleClaudeMessage(issue.id, message, repository.id),
+      onSessionEnd: (code) => this.handleClaudeSessionEnd(issue.id, code, repository.id),
+      onSessionError: (error) => this.handleClaudeSessionError(issue.id, error, repository.id)
     })
 
     // Store runner
@@ -448,10 +449,10 @@ export class EdgeWorker extends EventEmitter {
         allowedTools: repository.allowedTools || this.config.defaultAllowedTools || getSafeTools(),
         continueSession: true,
         workspaceName: issue.identifier,
-        onEvent: (event) => {
+        onMessage: (message) => {
           // Check for continuation errors
-          if (event.type === 'assistant' && 'message' in event && event.message?.content) {
-            const content = Array.isArray(event.message.content) ? event.message.content : [event.message.content]
+          if (message.type === 'assistant' && 'message' in message && message.message?.content) {
+            const content = Array.isArray(message.message.content) ? message.message.content : [message.message.content]
             for (const item of content) {
               if (item?.type === 'text' && item.text?.includes('tool_use` ids were found without `tool_result` blocks')) {
                 console.log('Detected corrupted conversation history, will restart fresh')
@@ -465,9 +466,10 @@ export class EdgeWorker extends EventEmitter {
               }
             }
           }
-          this.handleClaudeEvent(issue.id, event, repository.id)
+          this.handleClaudeMessage(issue.id, message, repository.id)
         },
-        onExit: (code) => this.handleClaudeExit(issue.id, code, repository.id)
+        onSessionEnd: (code) => this.handleClaudeSessionEnd(issue.id, code, repository.id),
+        onSessionError: (error) => this.handleClaudeSessionError(issue.id, error, repository.id)
       })
 
       // Store new runner
@@ -527,24 +529,24 @@ export class EdgeWorker extends EventEmitter {
   }
 
   /**
-   * Handle Claude events
+   * Handle Claude messages
    */
-  private async handleClaudeEvent(issueId: string, event: ClaudeMessage, repositoryId: string): Promise<void> {
+  private async handleClaudeMessage(issueId: string, message: ClaudeMessage, repositoryId: string): Promise<void> {
     // Emit generic event
-    this.emit('claude:event', issueId, event, repositoryId)
-    this.config.handlers?.onClaudeEvent?.(issueId, event, repositoryId)
+    this.emit('claude:event', issueId, message, repositoryId)
+    this.config.handlers?.onClaudeEvent?.(issueId, message, repositoryId)
 
-    // Handle specific events
-    if (event.type === 'assistant') {
-      const content = this.extractTextContent(event)
+    // Handle specific message types
+    if (message.type === 'assistant') {
+      const content = this.extractTextContent(message)
       if (content) {
         this.emit('claude:response', issueId, content, repositoryId)
         // Don't post assistant messages anymore - wait for result
       }
       
       // Also check for tool use in assistant messages
-      if ('message' in event && event.message && 'content' in event.message) {
-        const messageContent = Array.isArray(event.message.content) ? event.message.content : [event.message.content]
+      if ('message' in message && message.message && 'content' in message.message) {
+        const messageContent = Array.isArray(message.message.content) ? message.message.content : [message.message.content]
         for (const item of messageContent) {
           if (item && typeof item === 'object' && 'type' in item && item.type === 'tool_use') {
             this.emit('claude:tool-use', issueId, item.name, item.input, repositoryId)
@@ -557,41 +559,48 @@ export class EdgeWorker extends EventEmitter {
           }
         }
       }
-    } else if (event.type === 'result' && 'result' in event && event.result) {
+    } else if (message.type === 'result' && 'result' in message && message.result) {
       // Post the final result to Linear
       // Check if we have reply context (from a comment mention)
       const replyContext = this.issueToReplyContext.get(issueId)
       if (replyContext) {
         // Reply to the comment that mentioned us, using appropriate parentId
-        await this.postComment(issueId, event.result, repositoryId, replyContext.parentId)
+        await this.postComment(issueId, message.result, repositoryId, replyContext.parentId)
         // Clear the reply context after using it
         this.issueToReplyContext.delete(issueId)
       } else {
         // Fall back to replying to initial comment (for direct assignments)
         const initialCommentId = this.issueToCommentId.get(issueId)
-        await this.postComment(issueId, event.result, repositoryId, initialCommentId)
+        await this.postComment(issueId, message.result, repositoryId, initialCommentId)
       }
-    } else if (event.type === 'error' || event.type === 'tool_error') {
-      const errorMessage = 'message' in event ? event.message : 'error' in event ? event.error : 'Unknown error'
-      this.handleError(new Error(`Claude error: ${errorMessage}`))
     }
 
-    // Handle token limit
-    if (this.config.features?.enableTokenLimitHandling && event.type === 'error') {
-      if ('message' in event && event.message?.includes('token')) {
-        await this.handleTokenLimit(issueId, repositoryId)
-      }
-    }
+    // Note: Token limit handling is now handled by session:error event
   }
 
   /**
-   * Handle Claude process exit
+   * Handle Claude session end
    */
-  private handleClaudeExit(issueId: string, code: number | null, repositoryId: string): void {
+  private handleClaudeSessionEnd(issueId: string, code: number | null, repositoryId: string): void {
     this.claudeRunners.delete(issueId)
     this.sessionToRepo.delete(issueId)
     this.emit('session:ended', issueId, code, repositoryId)
     this.config.handlers?.onSessionEnd?.(issueId, code, repositoryId)
+  }
+
+  /**
+   * Handle Claude session error
+   */
+  private handleClaudeSessionError(issueId: string, error: Error, repositoryId: string): void {
+    console.error(`[EdgeWorker] Claude session error for issue ${issueId}:`, error)
+    
+    // Check for token limit in error message
+    if (this.config.features?.enableTokenLimitHandling && error.message?.includes('token')) {
+      this.handleTokenLimit(issueId, repositoryId).catch(console.error)
+    } else {
+      // General error handling
+      this.handleError(error)
+    }
   }
 
   /**
