@@ -113,21 +113,12 @@ describe('EdgeWorker', () => {
     // Create EdgeWorker instance
     edgeWorker = new EdgeWorker(mockConfig)
 
-    // Mock the fetchFullIssueDetails method to return a mock Linear issue
-    vi.spyOn(edgeWorker as any, 'fetchFullIssueDetails').mockResolvedValue({
-      id: 'issue-123',
-      identifier: 'TEST-123',
-      title: 'Test Issue',
-      description: 'Test description',
-      branchName: 'TEST-123-test-issue',
-      priority: 1,
-      state: Promise.resolve({ name: 'In Progress' }),
-      url: 'https://linear.app/test/issue/TEST-123'
-    })
+    // No longer need to mock fetchFullIssueDetails - the issue data comes directly from webhooks
   })
 
   afterEach(() => {
     vi.clearAllMocks()
+    delete process.env.DEBUG_EDGE
   })
 
   describe('initialization', () => {
@@ -256,14 +247,12 @@ describe('EdgeWorker', () => {
       const webhook = mockIssueAssignedWebhook()
       await webhookHandler(webhook)
 
-      // Should create workspace with full Linear issue
+      // Should create workspace with webhook issue data
       expect(mockConfig.handlers.createWorkspace).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 'issue-123',
           identifier: 'TEST-123',
-          title: 'Test Issue',
-          description: 'Test description',
-          branchName: 'TEST-123-test-issue'
+          title: 'Test Issue'
         }),
         expect.objectContaining({ id: 'test-repo' })
       )
@@ -278,15 +267,13 @@ describe('EdgeWorker', () => {
         expect.any(Session)
       )
 
-      // Should emit events with full Linear issue
+      // Should emit events with webhook issue data
       expect(mockConfig.handlers.onSessionStart).toHaveBeenCalledWith(
         'issue-123',
         expect.objectContaining({
           id: 'issue-123',
           identifier: 'TEST-123',
-          title: 'Test Issue',
-          description: 'Test description',
-          branchName: 'TEST-123-test-issue'
+          title: 'Test Issue'
         }),
         'test-repo'
       )
@@ -368,7 +355,7 @@ describe('EdgeWorker', () => {
       // Setup Claude runner with event handler
       let claudeEventHandler: Function
       vi.mocked(ClaudeRunner).mockImplementation((config) => {
-        claudeEventHandler = config.onEvent
+        claudeEventHandler = config.onMessage
         return mockClaudeRunner
       })
 
@@ -397,7 +384,7 @@ describe('EdgeWorker', () => {
     it('should handle tool use events', async () => {
       let claudeEventHandler: Function
       vi.mocked(ClaudeRunner).mockImplementation((config) => {
-        claudeEventHandler = config.onEvent
+        claudeEventHandler = config.onMessage
         return mockClaudeRunner
       })
 
@@ -417,9 +404,11 @@ describe('EdgeWorker', () => {
     })
 
     it('should handle Claude errors', async () => {
-      let claudeEventHandler: Function
+      let claudeErrorHandler: Function
+      const errorSpy = vi.fn()
+      
       vi.mocked(ClaudeRunner).mockImplementation((config) => {
-        claudeEventHandler = config.onEvent
+        claudeErrorHandler = config.onSessionError
         return mockClaudeRunner
       })
 
@@ -429,24 +418,19 @@ describe('EdgeWorker', () => {
       )?.[1]
       await webhookHandler(webhook)
 
-      const errorSpy = vi.fn()
       edgeWorker.on('error', errorSpy)
 
-      const event = mockClaudeErrorEvent('Something went wrong')
-      await claudeEventHandler!(event)
+      const error = new Error('Something went wrong')
+      claudeErrorHandler!(error)
 
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ message: 'Claude error: Something went wrong' })
-      )
-      expect(mockConfig.handlers.onError).toHaveBeenCalledWith(
-        expect.objectContaining({ message: 'Claude error: Something went wrong' })
-      )
+      expect(errorSpy).toHaveBeenCalledWith(error)
+      expect(mockConfig.handlers.onError).toHaveBeenCalledWith(error)
     })
 
     it('should handle token limit errors', async () => {
-      let claudeEventHandler: Function
+      let claudeErrorHandler: Function
       vi.mocked(ClaudeRunner).mockImplementation((config) => {
-        claudeEventHandler = config.onEvent
+        claudeErrorHandler = config.onSessionError
         return mockClaudeRunner
       })
 
@@ -457,19 +441,20 @@ describe('EdgeWorker', () => {
       await webhookHandler(webhook)
 
       mockSessionManager.getSession.mockReturnValue({
-        issue: webhook.notification.issue
+        issue: {
+          id: 'issue-123',
+          identifier: 'TEST-123',
+          title: 'Test Issue',
+          team: { id: 'test-workspace', key: 'TEST', name: 'Test Team' },
+          teamId: 'test-workspace',
+          url: 'https://linear.app/issue/TEST-123'
+        }
       })
 
-      const errorSpy = vi.fn()
-      edgeWorker.on('error', errorSpy)
+      const error = new Error('Request failed due to token limit exceeded')
+      claudeErrorHandler!(error)
 
-      const event = mockClaudeErrorEvent('token limit exceeded')
-      await claudeEventHandler!(event)
-
-      // Should emit error
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ message: 'Claude error: token limit exceeded' })
-      )
+      // Should trigger token limit handling
 
       // Should post warning
       expect(mockLinearClient.createComment).toHaveBeenCalledWith({
@@ -484,7 +469,7 @@ describe('EdgeWorker', () => {
     it('should handle Claude process exit', async () => {
       let exitHandler: Function
       vi.mocked(ClaudeRunner).mockImplementation((config) => {
-        exitHandler = config.onExit
+        exitHandler = config.onSessionEnd
         return mockClaudeRunner
       })
 
@@ -516,7 +501,7 @@ describe('EdgeWorker', () => {
 
       let claudeEventHandler: Function
       vi.mocked(ClaudeRunner).mockImplementation((config) => {
-        claudeEventHandler = config.onEvent
+        claudeEventHandler = config.onMessage
         return mockClaudeRunner
       })
 

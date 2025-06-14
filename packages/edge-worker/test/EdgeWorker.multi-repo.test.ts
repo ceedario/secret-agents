@@ -148,17 +148,7 @@ describe('EdgeWorker - Multi-Repository Support', () => {
       }
     })
 
-    // Mock the fetchFullIssueDetails method
-    vi.spyOn(edgeWorker as any, 'fetchFullIssueDetails').mockResolvedValue({
-      id: 'issue-123',
-      identifier: 'MOB-123',
-      title: 'Fix mobile bug',
-      description: 'Mobile issue description',
-      branchName: 'MOB-123-fix-mobile-bug',
-      priority: 2,
-      state: Promise.resolve({ name: 'To Do' }),
-      url: 'https://linear.app/test/issue/MOB-123'
-    })
+    // No longer need to mock fetchFullIssueDetails - the issue data comes directly from webhooks
 
     // Get the ndjson clients
     const ndjsonClients = (edgeWorker as any).ndjsonClients
@@ -237,17 +227,7 @@ describe('EdgeWorker - Multi-Repository Support', () => {
       }
     })
 
-    // Mock the fetchFullIssueDetails method for the second test
-    vi.spyOn(edgeWorker as any, 'fetchFullIssueDetails').mockResolvedValue({
-      id: 'issue-456',
-      identifier: 'BACK-456',
-      title: 'Update API',
-      description: 'Backend issue description',
-      branchName: 'BACK-456-update-api',
-      priority: 1,
-      state: Promise.resolve({ name: 'In Progress' }),
-      url: 'https://linear.app/test/issue/BACK-456'
-    })
+    // No longer need to mock fetchFullIssueDetails - the issue data comes directly from webhooks
 
     // Listen for events
     const sessionStartedHandler = vi.fn()

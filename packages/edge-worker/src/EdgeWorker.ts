@@ -266,7 +266,7 @@ export class EdgeWorker extends EventEmitter {
     console.log(`[EdgeWorker] handleIssueAssigned started for issue ${issue.identifier} (${issue.id})`)
     
     // Move issue to started state automatically
-    await this.moveIssueToStartedState(fullIssue, repository.id)
+    await this.moveIssueToStartedState(issue, repository.id)
     
     // Post initial comment immediately
     const initialComment = await this.postInitialComment(issue.id, repository.id)
