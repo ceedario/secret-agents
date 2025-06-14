@@ -30,10 +30,8 @@ export async function createCLIEdgeWorker(config: any) {
   const edgeWorker = new EdgeWorker({
     // Use OAuth token for both proxy and Linear API
     proxyUrl: config.edge.proxyUrl,
-    linearToken: linearToken,
     
     // Claude configuration
-    claudePath: config.claude.path,
     defaultAllowedTools: config.claude.allowedTools,
     
     // Workspace configuration

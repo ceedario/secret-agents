@@ -45,7 +45,6 @@ describe('EdgeWorker', () => {
     // Setup config with single repository for backward compatibility
     mockConfig = {
       proxyUrl: 'http://localhost:3000',
-      claudePath: '/usr/local/bin/claude',
       repositories: [{
         id: 'test-repo',
         name: 'Test Repository',
@@ -164,7 +163,6 @@ describe('EdgeWorker', () => {
     it('should work without handlers', () => {
       const minimalConfig = {
         proxyUrl: 'http://localhost:3000',
-        claudePath: '/usr/local/bin/claude',
         repositories: [{
           id: 'minimal-repo',
           name: 'Minimal Repository',

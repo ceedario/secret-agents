@@ -124,7 +124,6 @@ describe('EdgeWorker - Multi-Repository Support', () => {
   it('should initialize with multiple repositories', () => {
     edgeWorker = new EdgeWorker({
       proxyUrl: 'http://proxy.test',
-      claudePath: '/usr/bin/claude',
       repositories: mockRepositories
     })
 
@@ -143,7 +142,6 @@ describe('EdgeWorker - Multi-Repository Support', () => {
 
     edgeWorker = new EdgeWorker({
       proxyUrl: 'http://proxy.test',
-      claudePath: '/usr/bin/claude',
       repositories: mockRepositories,
       handlers: {
         createWorkspace: createWorkspaceMock
@@ -232,7 +230,6 @@ describe('EdgeWorker - Multi-Repository Support', () => {
 
     edgeWorker = new EdgeWorker({
       proxyUrl: 'http://proxy.test',
-      claudePath: '/usr/bin/claude',
       repositories: mockRepositories,
       handlers: {
         onSessionStart: onSessionStartMock,
@@ -335,7 +332,6 @@ describe('EdgeWorker - Multi-Repository Support', () => {
 
     edgeWorker = new EdgeWorker({
       proxyUrl: 'http://proxy.test',
-      claudePath: '/usr/bin/claude',
       repositories: reposWithInactive
     })
 
@@ -351,7 +347,6 @@ describe('EdgeWorker - Multi-Repository Support', () => {
 
     edgeWorker = new EdgeWorker({
       proxyUrl: 'http://proxy.test',
-      claudePath: '/usr/bin/claude',
       repositories: reposWithTemplates
     })
 
@@ -380,7 +375,6 @@ describe('EdgeWorker - Multi-Repository Support', () => {
   it('should post comments using correct Linear client', async () => {
     edgeWorker = new EdgeWorker({
       proxyUrl: 'http://proxy.test',
-      claudePath: '/usr/bin/claude',
       repositories: mockRepositories
     })
 
@@ -412,7 +406,6 @@ describe('EdgeWorker - Multi-Repository Support', () => {
   it('should handle connection status per token', () => {
     edgeWorker = new EdgeWorker({
       proxyUrl: 'http://proxy.test',
-      claudePath: '/usr/bin/claude',
       repositories: mockRepositories
     })
 

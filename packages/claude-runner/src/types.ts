@@ -5,7 +5,6 @@ export type ClaudeMessage = SDKMessage
 export type SDKOptions = Options
 
 export interface ClaudeRunnerConfig {
-  claudePath?: string // Optional now since we use SDK
   workingDirectory?: string
   allowedTools?: string[]
   allowedDirectories?: string[] // Not part of SDK, but kept for backwards compatibility

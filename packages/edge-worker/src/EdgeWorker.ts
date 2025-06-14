@@ -289,7 +289,6 @@ export class EdgeWorker extends EventEmitter {
 
     // Create Claude runner with attachment directory access
     const runner = new ClaudeRunner({
-      claudePath: this.config.claudePath,
       workingDirectory: workspace.path,
       allowedTools: repository.allowedTools || this.config.defaultAllowedTools || getSafeTools(),
       allowedDirectories,
@@ -444,7 +443,6 @@ export class EdgeWorker extends EventEmitter {
     try {
       // Create new runner with --continue flag
       const runner = new ClaudeRunner({
-        claudePath: this.config.claudePath,
         workingDirectory: session.workspace.path,
         allowedTools: repository.allowedTools || this.config.defaultAllowedTools || getSafeTools(),
         continueSession: true,

@@ -34,7 +34,6 @@ export interface EdgeWorkerConfig {
   proxyUrl: string
   
   // Claude config (shared across all repos)
-  claudePath: string
   defaultAllowedTools?: string[]
   
   // Repository configurations

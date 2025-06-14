@@ -25,7 +25,6 @@ const edgeWorker = new EdgeWorker({
   proxyUrl: 'https://edge-proxy.example.com',
   
   // Claude
-  claudePath: '/usr/local/bin/claude',
   defaultAllowedTools: ['bash', 'edit', 'read'],
   
   // Single repository configuration
@@ -87,7 +86,6 @@ const repositories = userSettings.repositories.map(repo => ({
 
 const edgeWorker = new EdgeWorker({
   proxyUrl: config.proxyUrl,
-  claudePath: getClaudePath(),
   
   // Multiple repositories
   repositories,
@@ -132,7 +130,6 @@ await edgeWorker.start()
 ### Required Config
 
 - `proxyUrl`: URL of the edge proxy server
-- `claudePath`: Path to Claude CLI executable
 - `repositories`: Array of repository configurations
 
 ### Repository Configuration

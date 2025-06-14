@@ -9,26 +9,26 @@
 
 import { EdgeWorker } from 'cyrus-edge-worker'
 import { BrowserWindow, Notification, ipcMain, app } from 'electron'
+import path from 'path'
 
 export async function createElectronEdgeWorker(
   mainWindow: BrowserWindow,
   userToken: string,
   proxyUrl: string
 ) {
-  // Get Claude path based on platform
-  const claudePath = process.platform === 'darwin' 
-    ? '/Applications/Claude.app/Contents/MacOS/claude'
-    : process.platform === 'win32'
-    ? 'C:\\Program Files\\Claude\\claude.exe'
-    : '/usr/local/bin/claude'
-
   // Create EdgeWorker with Electron-specific configuration
   const edgeWorker = new EdgeWorker({
     // Simple config - token from user OAuth flow
     proxyUrl: proxyUrl,
-    linearToken: userToken,
-    claudePath: claudePath,
-    workspaceBaseDir: path.join(app.getPath('userData'), 'workspaces'),
+    repositories: [{
+      id: 'electron-repo',
+      name: 'Electron Workspace',
+      repositoryPath: path.join(app.getPath('userData'), 'repository'),
+      baseBranch: 'main',
+      linearWorkspaceId: 'user-workspace',
+      linearToken: userToken,
+      workspaceBaseDir: path.join(app.getPath('userData'), 'workspaces')
+    }],
     
     // Electron-specific handlers for UI integration
     handlers: {
