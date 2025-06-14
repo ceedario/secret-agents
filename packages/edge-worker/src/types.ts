@@ -68,39 +68,6 @@ export interface EdgeWorkerConfig {
   }
 }
 
-/**
- * Webhook types we handle
- */
-export interface IssueAssignedWebhook {
-  type: 'webhook'
-  id: string
-  timestamp: string
-  data: {
-    type: 'AppUserNotification'
-    notification: {
-      type: 'issueAssignedToYou'
-      issue: any  // Linear issue data
-    }
-    createdAt: string
-    eventId?: string
-  }
-}
-
-export interface CommentCreatedWebhook {
-  type: 'webhook'
-  id: string
-  timestamp: string
-  data: {
-    type: 'Comment'
-    action: 'create'
-    createdAt: string
-    data: {
-      issue: any
-      comment: any
-    }
-    eventId?: string
-  }
-}
 
 /**
  * Events emitted by EdgeWorker
