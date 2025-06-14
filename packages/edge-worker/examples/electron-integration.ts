@@ -7,7 +7,7 @@
  * - System notifications
  */
 
-import { EdgeWorker } from '@cyrus/edge-worker'
+import { EdgeWorker } from 'cyrus-edge-worker'
 import { BrowserWindow, Notification, ipcMain, app } from 'electron'
 
 export async function createElectronEdgeWorker(

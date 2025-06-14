@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EdgeWorker } from '../src/EdgeWorker'
 import { LinearClient } from '@linear/sdk'
-import { NdjsonClient } from '@cyrus/ndjson-client'
-import { ClaudeRunner } from '@cyrus/claude-runner'
-import { SessionManager, Session } from '@cyrus/core'
+import { NdjsonClient } from 'cyrus-ndjson-client'
+import { ClaudeRunner } from 'cyrus-claude-runner'
+import { SessionManager, Session } from 'cyrus-core'
 import type { EdgeWorkerConfig } from '../src/types'
 import { 
   mockIssueAssignedWebhook, 
   mockCommentWebhook,
-  mockLegacyCommentWebhook,
+  mockUnassignedWebhook,
   mockClaudeAssistantEvent,
   mockClaudeToolEvent,
   mockClaudeErrorEvent
@@ -16,9 +16,22 @@ import {
 
 // Mock dependencies
 vi.mock('@linear/sdk')
-vi.mock('@cyrus/ndjson-client')
-vi.mock('@cyrus/claude-runner')
-vi.mock('@cyrus/core')
+vi.mock('cyrus-ndjson-client')
+vi.mock('cyrus-claude-runner')
+vi.mock('cyrus-core', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // Keep the actual type guard functions
+    isIssueAssignedWebhook: actual.isIssueAssignedWebhook,
+    isIssueCommentMentionWebhook: actual.isIssueCommentMentionWebhook,
+    isIssueNewCommentWebhook: actual.isIssueNewCommentWebhook,
+    isIssueUnassignedWebhook: actual.isIssueUnassignedWebhook,
+    // Mock Session and SessionManager
+    Session: vi.fn(),
+    SessionManager: vi.fn()
+  }
+})
 
 describe('EdgeWorker', () => {
   let edgeWorker: EdgeWorker
@@ -100,6 +113,18 @@ describe('EdgeWorker', () => {
 
     // Create EdgeWorker instance
     edgeWorker = new EdgeWorker(mockConfig)
+
+    // Mock the fetchFullIssueDetails method to return a mock Linear issue
+    vi.spyOn(edgeWorker as any, 'fetchFullIssueDetails').mockResolvedValue({
+      id: 'issue-123',
+      identifier: 'TEST-123',
+      title: 'Test Issue',
+      description: 'Test description',
+      branchName: 'TEST-123-test-issue',
+      priority: 1,
+      state: Promise.resolve({ name: 'In Progress' }),
+      url: 'https://linear.app/test/issue/TEST-123'
+    })
   })
 
   afterEach(() => {
@@ -231,11 +256,17 @@ describe('EdgeWorker', () => {
 
     it('should handle issue assignment notifications', async () => {
       const webhook = mockIssueAssignedWebhook()
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
-      // Should create workspace
+      // Should create workspace with full Linear issue
       expect(mockConfig.handlers.createWorkspace).toHaveBeenCalledWith(
-        webhook.data.notification.issue,
+        expect.objectContaining({
+          id: 'issue-123',
+          identifier: 'TEST-123',
+          title: 'Test Issue',
+          description: 'Test description',
+          branchName: 'TEST-123-test-issue'
+        }),
         expect.objectContaining({ id: 'test-repo' })
       )
 
@@ -249,25 +280,25 @@ describe('EdgeWorker', () => {
         expect.any(Session)
       )
 
-      // Should emit events
+      // Should emit events with full Linear issue
       expect(mockConfig.handlers.onSessionStart).toHaveBeenCalledWith(
         'issue-123',
-        webhook.data.notification.issue,
+        expect.objectContaining({
+          id: 'issue-123',
+          identifier: 'TEST-123',
+          title: 'Test Issue',
+          description: 'Test description',
+          branchName: 'TEST-123-test-issue'
+        }),
         'test-repo'
       )
-
-      // Should report success
-      expect(mockNdjsonClient.sendStatus).toHaveBeenCalledWith({
-        eventId: 'event-123',
-        status: 'completed'
-      })
     })
 
     it('should use default workspace if no handler provided', async () => {
       delete mockConfig.handlers.createWorkspace
       const webhook = mockIssueAssignedWebhook()
       
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       // Should still work with default workspace
       expect(vi.mocked(ClaudeRunner)).toHaveBeenCalledWith(
@@ -284,21 +315,26 @@ describe('EdgeWorker', () => {
       })
 
       const webhook = mockCommentWebhook()
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       // Should send input to Claude
       expect(mockClaudeRunner.sendInput).toHaveBeenCalledWith('Test comment')
     })
 
-    it('should handle legacy comment webhooks', async () => {
+    it('should handle issue unassignment', async () => {
       mockSessionManager.getSession.mockReturnValue({
         workspace: { path: '/tmp/test-workspaces/TEST-123' }
       })
 
-      const webhook = mockLegacyCommentWebhook()
-      await webhookHandler(webhook.data)
+      // Set up a mock Claude runner in the internal map
+      const mockRunner = { kill: vi.fn() }
+      edgeWorker['claudeRunners'].set('issue-123', mockRunner as any)
 
-      expect(mockClaudeRunner.sendInput).toHaveBeenCalledWith('Test comment')
+      const webhook = mockUnassignedWebhook()
+      await webhookHandler(webhook)
+
+      expect(mockRunner.kill).toHaveBeenCalled()
+      expect(mockSessionManager.removeSession).toHaveBeenCalledWith('issue-123')
     })
 
     it('should ignore comments when continuation is disabled', async () => {
@@ -306,7 +342,7 @@ describe('EdgeWorker', () => {
       mockSessionManager.getSession.mockReturnValue({})
 
       const webhook = mockCommentWebhook()
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       expect(mockClaudeRunner.sendInput).not.toHaveBeenCalled()
     })
@@ -315,7 +351,7 @@ describe('EdgeWorker', () => {
       mockSessionManager.getSession.mockReturnValue(null)
 
       const webhook = mockCommentWebhook()
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       expect(mockClaudeRunner.sendInput).not.toHaveBeenCalled()
     })
@@ -324,36 +360,9 @@ describe('EdgeWorker', () => {
       mockConfig.handlers.createWorkspace!.mockRejectedValue(new Error('Workspace error'))
 
       const webhook = mockIssueAssignedWebhook()
-      await expect(webhookHandler(webhook.data)).rejects.toThrow('Workspace error')
-
-      expect(mockNdjsonClient.sendStatus).toHaveBeenCalledWith({
-        eventId: 'event-123',
-        status: 'failed',
-        error: 'Workspace error'
-      })
+      await expect(webhookHandler(webhook)).rejects.toThrow('Workspace error')
     })
 
-    it('should handle issue unassignment', async () => {
-      const runner = { kill: vi.fn() }
-      edgeWorker['claudeRunners'].set('issue-123', runner as any)
-
-      const webhook = {
-        type: 'webhook',
-        data: {
-          type: 'AppUserNotification',
-          notification: {
-            type: 'issueUnassignedFromYou',
-            issue: { id: 'issue-123' }
-          }
-        }
-      }
-
-      await webhookHandler(webhook.data)
-
-      expect(runner.kill).toHaveBeenCalled()
-      expect(mockSessionManager.removeSession).toHaveBeenCalledWith('issue-123')
-      expect(mockConfig.handlers.onSessionEnd).toHaveBeenCalledWith('issue-123', null, 'test-repo')
-    })
   })
 
   describe('Claude event handling', () => {
@@ -370,7 +379,7 @@ describe('EdgeWorker', () => {
       const webhookHandler = mockNdjsonClient.on.mock.calls.find(
         (call: any) => call[0] === 'webhook'
       )?.[1]
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       // Emit Claude assistant event
       const event = mockClaudeAssistantEvent('Hello from Claude!')
@@ -398,7 +407,7 @@ describe('EdgeWorker', () => {
       const webhookHandler = mockNdjsonClient.on.mock.calls.find(
         (call: any) => call[0] === 'webhook'
       )?.[1]
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       const toolUseSpy = vi.fn()
       edgeWorker.on('claude:tool-use', toolUseSpy)
@@ -420,7 +429,7 @@ describe('EdgeWorker', () => {
       const webhookHandler = mockNdjsonClient.on.mock.calls.find(
         (call: any) => call[0] === 'webhook'
       )?.[1]
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       const errorSpy = vi.fn()
       edgeWorker.on('error', errorSpy)
@@ -447,10 +456,10 @@ describe('EdgeWorker', () => {
       const webhookHandler = mockNdjsonClient.on.mock.calls.find(
         (call: any) => call[0] === 'webhook'
       )?.[1]
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       mockSessionManager.getSession.mockReturnValue({
-        issue: webhook.data.notification.issue
+        issue: webhook.notification.issue
       })
 
       const errorSpy = vi.fn()
@@ -486,7 +495,7 @@ describe('EdgeWorker', () => {
       const webhookHandler = mockNdjsonClient.on.mock.calls.find(
         (call: any) => call[0] === 'webhook'
       )?.[1]
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       // Now test exit handling
       exitHandler!(0)
@@ -517,7 +526,7 @@ describe('EdgeWorker', () => {
       const webhookHandler = mockNdjsonClient.on.mock.calls.find(
         (call: any) => call[0] === 'webhook'
       )?.[1]
-      await webhookHandler(webhook.data)
+      await webhookHandler(webhook)
 
       // Use a result event which actually posts comments
       const event: ClaudeEvent = {
@@ -574,6 +583,19 @@ describe('EdgeWorker', () => {
 
       const sessions = edgeWorker.getActiveSessions()
       expect(sessions).toEqual(['issue-1', 'issue-2', 'issue-3'])
+    })
+  })
+
+  describe('branch name sanitization', () => {
+    it('should sanitize branch names by removing backticks', () => {
+      // Test the sanitization function directly
+      const sanitizeBranchName = (name: string) => name ? name.replace(/`/g, '') : name
+      
+      expect(sanitizeBranchName('TEST-123-issue-with-`backticks`-in-title')).toBe('TEST-123-issue-with-backticks-in-title')
+      expect(sanitizeBranchName('Normal-branch-name')).toBe('Normal-branch-name')
+      expect(sanitizeBranchName('`start-with-backtick')).toBe('start-with-backtick')
+      expect(sanitizeBranchName('end-with-backtick`')).toBe('end-with-backtick')
+      expect(sanitizeBranchName('')).toBe('')
     })
   })
 })

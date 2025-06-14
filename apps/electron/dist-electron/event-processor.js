@@ -5,11 +5,11 @@ const events_1 = require("events");
 const child_process_1 = require("child_process");
 const path_1 = require("path");
 const promises_1 = require("fs/promises");
-const core_1 = require("@cyrus/core");
+const cyrus_core_1 = require("cyrus-core");
 class EventProcessor extends events_1.EventEmitter {
     constructor(config) {
         super();
-        this.sessionManager = new core_1.SessionManager();
+        this.sessionManager = new cyrus_core_1.SessionManager();
         this.config = config;
     }
     async processEvent(event) {
@@ -91,7 +91,7 @@ Please help solve this issue.
             }
         });
         // Create Session object
-        const session = new core_1.Session({
+        const session = new cyrus_core_1.Session({
             issue,
             workspace,
             process: claudeProcess,

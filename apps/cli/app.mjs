@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { EdgeWorker } from '@cyrus/edge-worker'
+import { EdgeWorker } from 'cyrus-edge-worker'
 import dotenv from 'dotenv'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { resolve, dirname, basename } from 'path'
@@ -84,7 +84,10 @@ class EdgeApp {
       const repositoryName = await question(`Repository name (default: ${basename(repositoryPath)}): `) || basename(repositoryPath)
       const baseBranch = await question('Base branch (default: main): ') || 'main'
       const workspaceBaseDir = await question(`Workspace directory (default: ${repositoryPath}/workspaces): `) || `${repositoryPath}/workspaces`
-      const promptTemplatePath = await question('Prompt template path (default: ./agent-prompt-template.md): ') || './agent-prompt-template.md'
+      
+      console.log('\n📝 Prompt Template (optional)')
+      console.log('Leave blank to use the built-in default template')
+      const promptTemplatePath = await question('Custom prompt template path (press Enter to skip): ')
       
       // Ask for allowed tools configuration
       console.log('\n🔧 Tool Configuration')
@@ -113,7 +116,7 @@ class EdgeApp {
         linearToken: linearCredentials.linearToken,
         workspaceBaseDir: resolve(workspaceBaseDir),
         isActive: true,
-        promptTemplatePath: resolve(promptTemplatePath),
+        ...(promptTemplatePath && { promptTemplatePath: resolve(promptTemplatePath) }),
         ...(allowedTools && { allowedTools })
       }
       
@@ -257,8 +260,24 @@ class EdgeApp {
       const proxyUrl = process.env.PROXY_URL
       if (!proxyUrl) {
         console.error('❌ PROXY_URL environment variable is required')
-        console.log('\nPlease set PROXY_URL in your .env.cyrus file:')
-        console.log('PROXY_URL=https://your-proxy-server.com')
+        console.log('\nPlease add the following to your .env.cyrus file:')
+        console.log('PROXY_URL=https://cyrus-proxy.ceedar.workers.dev')
+        console.log('\nThis connects to the secure public Cyrus proxy for Linear OAuth and webhooks.')
+        process.exit(1)
+      }
+      
+      // Validate Claude CLI
+      const claudePath = process.env.CLAUDE_PATH || 'claude'
+      try {
+        const { execSync } = await import('child_process')
+        execSync(`which ${claudePath}`, { stdio: 'ignore' })
+      } catch (error) {
+        console.error(`❌ Claude CLI not found at: ${claudePath}`)
+        console.log('\nPlease ensure Claude Code is installed:')
+        console.log('• Claude Pro/Max users: Install from https://claude.ai/code')
+        console.log('• API users: Set ANTHROPIC_API_KEY in .env.cyrus and install claude-ai CLI')
+        console.log('\nIf Claude is installed in a custom location, set CLAUDE_PATH in .env.cyrus:')
+        console.log('CLAUDE_PATH=/path/to/claude')
         process.exit(1)
       }
       
@@ -418,7 +437,7 @@ class EdgeApp {
       const config = {
         proxyUrl,
         repositories,
-        claudePath: process.env.CLAUDE_PATH || 'claude',
+        claudePath,
         allowedTools: process.env.ALLOWED_TOOLS?.split(',').map(t => t.trim()) || [],
         features: {
           enableContinuation: true
@@ -518,8 +537,12 @@ class EdgeApp {
         throw new Error('Not a git repository')
       }
       
+      // Sanitize branch name by removing backticks to prevent command injection
+      const sanitizeBranchName = (name) => name ? name.replace(/`/g, '') : name
+      
       // Use Linear's preferred branch name, or generate one if not available
-      const branchName = issue.branchName || `${issue.identifier}-${issue.title?.toLowerCase().replace(/\s+/g, '-').substring(0, 30)}`
+      const rawBranchName = issue.branchName || `${issue.identifier}-${issue.title?.toLowerCase().replace(/\s+/g, '-').substring(0, 30)}`
+      const branchName = sanitizeBranchName(rawBranchName)
       const workspacePath = join(repository.workspaceBaseDir, issue.identifier)
       
       // Ensure workspace directory exists
@@ -558,10 +581,22 @@ class EdgeApp {
         // Branch doesn't exist, we'll create it
       }
       
-      // Create the worktree
-      console.log(`Creating git worktree at ${workspacePath} from ${repository.baseBranch}`)
+      // Fetch latest changes from remote
+      console.log('Fetching latest changes from remote...')
+      try {
+        execSync('git fetch origin', {
+          cwd: repository.repositoryPath,
+          stdio: 'pipe'
+        })
+      } catch (e) {
+        console.warn('Warning: git fetch failed, proceeding with local branch:', e.message)
+      }
+
+      // Create the worktree from remote branch
+      const remoteBranch = `origin/${repository.baseBranch}`
+      console.log(`Creating git worktree at ${workspacePath} from ${remoteBranch}`)
       const worktreeCmd = createBranch 
-        ? `git worktree add "${workspacePath}" -b "${branchName}" "${repository.baseBranch}"`
+        ? `git worktree add "${workspacePath}" -b "${branchName}" "${remoteBranch}"`
         : `git worktree add "${workspacePath}" "${branchName}"`
       
       execSync(worktreeCmd, {

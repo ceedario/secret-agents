@@ -1,0 +1,28 @@
+# Test files
+__tests__/
+*.test.mjs
+*.spec.mjs
+vitest.config.js
+
+# Development files
+.env
+.env.*
+nodemon.json
+
+# Build artifacts
+dist/
+*.log
+coverage/
+
+# Editor files
+.vscode/
+.idea/
+
+# Git files
+.git/
+.gitignore
+
+# Other
+.DS_Store
+node_modules/
+pnpm-lock.yaml

@@ -7,7 +7,7 @@ vi.mock('child_process', () => ({
 }))
 
 // Mock StdoutParser
-vi.mock('@cyrus/claude-parser', () => {
+vi.mock('cyrus-claude-parser', () => {
   const EventEmitter = require('events').EventEmitter
   class MockStdoutParser extends EventEmitter {
     processData = vi.fn()
@@ -17,7 +17,7 @@ vi.mock('@cyrus/claude-parser', () => {
 })
 
 import { spawn } from 'child_process'
-import { StdoutParser } from '@cyrus/claude-parser'
+import { StdoutParser } from 'cyrus-claude-parser'
 import { ClaudeRunner } from '../src/ClaudeRunner'
 import type { ClaudeRunnerConfig } from '../src/types'
 import type { 
@@ -26,7 +26,7 @@ import type {
   ResultEvent, 
   ErrorEvent, 
   ToolErrorEvent 
-} from '@cyrus/claude-parser'
+} from 'cyrus-claude-parser'
 
 describe('ClaudeRunner', () => {
   let runner: ClaudeRunner

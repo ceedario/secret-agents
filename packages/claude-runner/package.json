@@ -1,5 +1,5 @@
 {
-  "name": "@cyrus/claude-runner",
+  "name": "cyrus-claude-runner",
   "version": "0.0.1",
   "description": "Claude process spawning and management for Cyrus",
   "type": "module",

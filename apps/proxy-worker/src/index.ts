@@ -15,7 +15,8 @@ router.get('/', (request: Request, env: Env) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Cyrus Edge Proxy</title>
+      <meta charset="utf-8">
+      <title>Cyrus Proxy Worker</title>
       <style>
         body { font-family: system-ui; max-width: 600px; margin: 50px auto; padding: 20px; }
         .endpoint { background: #f3f4f6; padding: 15px; margin: 10px 0; border-radius: 8px; }
@@ -25,7 +26,7 @@ router.get('/', (request: Request, env: Env) => {
       </style>
     </head>
     <body>
-      <h1>🚀 Cyrus Edge Proxy (Cloudflare Workers)</h1>
+      <h1>🚀 Cyrus Proxy Worker (Cloudflare Workers)</h1>
       <p>A distributed OAuth and webhook handler for Linear integration.</p>
       
       <h2>Available Endpoints:</h2>
@@ -61,7 +62,7 @@ router.get('/', (request: Request, env: Env) => {
     </html>
   `, {
     status: 200,
-    headers: { 'Content-Type': 'text/html' }
+    headers: { 'Content-Type': 'text/html; charset=utf-8' }
   })
 })
 

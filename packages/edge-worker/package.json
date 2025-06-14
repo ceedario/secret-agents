@@ -1,5 +1,5 @@
 {
-  "name": "@cyrus/edge-worker",
+  "name": "cyrus-edge-worker",
   "version": "0.0.1",
   "description": "Unified edge worker for processing Linear issues with Claude",
   "type": "module",
@@ -19,9 +19,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cyrus/claude-runner": "workspace:*",
-    "@cyrus/core": "workspace:*",
-    "@cyrus/ndjson-client": "workspace:*",
+    "cyrus-claude-runner": "workspace:*",
+    "cyrus-core": "workspace:*",
+    "cyrus-ndjson-client": "workspace:*",
     "@linear/sdk": "^39.0.0",
     "file-type": "^18.7.0"
   },

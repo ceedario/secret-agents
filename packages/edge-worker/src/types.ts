@@ -1,5 +1,5 @@
-import type { Issue, Workspace } from '@cyrus/core'
-import type { ClaudeMessage } from '@cyrus/claude-runner'
+import type { Issue, Workspace } from 'cyrus-core'
+import type { ClaudeMessage } from 'cyrus-claude-runner'
 
 /**
  * Configuration for a single repository/workspace pair

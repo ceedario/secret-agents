@@ -1,5 +1,5 @@
 {
-  "name": "@cyrus/core",
+  "name": "cyrus-core",
   "version": "0.0.1",
   "description": "Core business logic for Cyrus",
   "type": "module",

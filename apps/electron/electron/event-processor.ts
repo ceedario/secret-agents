@@ -2,7 +2,7 @@ import { EventEmitter } from 'events'
 import { spawn } from 'child_process'
 import { join } from 'path'
 import { mkdir, writeFile } from 'fs/promises'
-import { Session, SessionManager, type Issue, type Workspace } from '@cyrus/core'
+import { Session, SessionManager, type Issue, type Workspace } from 'cyrus-core'
 
 interface ProcessorConfig {
   linearToken: string
