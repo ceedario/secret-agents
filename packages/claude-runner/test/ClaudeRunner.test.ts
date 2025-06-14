@@ -1,656 +1,311 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'events'
 
-// Mock child_process
-vi.mock('child_process', () => ({
-  spawn: vi.fn()
+// Mock @anthropic-ai/claude-code SDK
+vi.mock('@anthropic-ai/claude-code', () => ({
+  query: vi.fn()
 }))
 
-// Mock StdoutParser
-vi.mock('cyrus-claude-parser', () => {
-  const EventEmitter = require('events').EventEmitter
-  class MockStdoutParser extends EventEmitter {
-    processData = vi.fn()
-    processEnd = vi.fn()
-  }
-  return { StdoutParser: MockStdoutParser }
-})
-
-import { spawn } from 'child_process'
-import { StdoutParser } from 'cyrus-claude-parser'
 import { ClaudeRunner } from '../src/ClaudeRunner'
 import type { ClaudeRunnerConfig } from '../src/types'
-import type { 
-  ClaudeEvent, 
-  AssistantEvent, 
-  ResultEvent, 
-  ErrorEvent, 
-  ToolErrorEvent 
-} from 'cyrus-claude-parser'
+import type { ClaudeMessage } from '../src/types'
+import { query } from '@anthropic-ai/claude-code'
+
+// Cast the mocked query function
+const mockQuery = vi.mocked(query)
 
 describe('ClaudeRunner', () => {
   let runner: ClaudeRunner
-  let mockProcess: any
-  let mockStdin: any
-  let mockStdout: any
-  let mockStderr: any
   
   const defaultConfig: ClaudeRunnerConfig = {
-    claudePath: '/usr/local/bin/claude'
+    workingDirectory: '/tmp/test'
   }
 
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks()
     
-    // Create mock streams
-    mockStdin = {
-      write: vi.fn((data, cb) => cb && cb()),
-      end: vi.fn()
-    }
-    mockStdout = new EventEmitter()
-    mockStderr = new EventEmitter()
-    
-    // Create mock process
-    mockProcess = new EventEmitter()
-    mockProcess.stdin = mockStdin
-    mockProcess.stdout = mockStdout
-    mockProcess.stderr = mockStderr
-    mockProcess.pid = 12345
-    mockProcess.killed = false
-    mockProcess.kill = vi.fn(() => {
-      mockProcess.killed = true
-      setImmediate(() => mockProcess.emit('exit', 0))
+    // Default mock implementation that returns an empty async generator
+    mockQuery.mockImplementation(async function* () {
+      // Empty generator by default
     })
-    
-    // Mock spawn to return our mock process
-    vi.mocked(spawn).mockReturnValue(mockProcess as any)
-    
-    runner = new ClaudeRunner(defaultConfig)
   })
 
   afterEach(() => {
-    if (runner.isRunning()) {
+    if (runner) {
       runner.kill()
     }
   })
 
   describe('Constructor & Initialization', () => {
-    it('should create instance with required config', () => {
+    it('should create ClaudeRunner instance', () => {
+      runner = new ClaudeRunner(defaultConfig)
       expect(runner).toBeInstanceOf(ClaudeRunner)
       expect(runner).toBeInstanceOf(EventEmitter)
     })
 
-    it('should register onEvent callback if provided', () => {
-      const onEvent = vi.fn()
-      const runnerWithCallback = new ClaudeRunner({
+    it('should register onMessage callback if provided', () => {
+      const onMessage = vi.fn()
+      runner = new ClaudeRunner({
         ...defaultConfig,
-        onEvent
+        onMessage
       })
       
-      runnerWithCallback.emit('message', { type: 'test' } as any)
-      expect(onEvent).toHaveBeenCalledWith({ type: 'test' })
+      runner.emit('message', { type: 'test' } as any)
+      expect(onMessage).toHaveBeenCalledWith({ type: 'test' })
     })
 
-    it('should register onError callback if provided', () => {
-      const onError = vi.fn()
-      const runnerWithCallback = new ClaudeRunner({
+    it('should register onSessionStart callback if provided', () => {
+      const onSessionStart = vi.fn()
+      runner = new ClaudeRunner({
         ...defaultConfig,
-        onError
+        onSessionStart
+      })
+      
+      runner.emit('session:start')
+      expect(onSessionStart).toHaveBeenCalled()
+    })
+
+    it('should register onSessionEnd callback if provided', () => {
+      const onSessionEnd = vi.fn()
+      runner = new ClaudeRunner({
+        ...defaultConfig,
+        onSessionEnd
+      })
+      
+      runner.emit('session:end', 0)
+      expect(onSessionEnd).toHaveBeenCalledWith(0)
+    })
+
+    it('should register onSessionError callback if provided', () => {
+      const onSessionError = vi.fn()
+      runner = new ClaudeRunner({
+        ...defaultConfig,
+        onSessionError
       })
       
       const error = new Error('test error')
-      runnerWithCallback.emit('error', error)
-      expect(onError).toHaveBeenCalledWith(error)
-    })
-
-    it('should register onExit callback if provided', () => {
-      const onExit = vi.fn()
-      const runnerWithCallback = new ClaudeRunner({
-        ...defaultConfig,
-        onExit
-      })
-      
-      runnerWithCallback.emit('exit', 0)
-      expect(onExit).toHaveBeenCalledWith(0)
+      runner.emit('session:error', error)
+      expect(onSessionError).toHaveBeenCalledWith(error)
     })
   })
 
   describe('spawn()', () => {
-    it('should spawn claude process with basic arguments', () => {
+    it('should start Claude SDK session', () => {
+      runner = new ClaudeRunner(defaultConfig)
+      
       const result = runner.spawn()
       
-      expect(spawn).toHaveBeenCalledWith(
-        'sh',
-        ['-c', '/usr/local/bin/claude --print --verbose --output-format stream-json | jq -c .'],
-        {
-          cwd: undefined,
-          stdio: ['pipe', 'pipe', 'pipe'],
-          shell: false
-        }
-      )
-      
       expect(result).toEqual({
-        process: mockProcess,
-        pid: 12345,
+        process: null,
+        pid: undefined,
         startedAt: expect.any(Date)
       })
+      expect(runner.isRunning()).toBe(true)
     })
 
-    it('should spawn with working directory if provided', () => {
-      const runnerWithDir = new ClaudeRunner({
-        ...defaultConfig,
-        workingDirectory: '/workspace'
-      })
+    it('should emit session:start event', () => {
+      runner = new ClaudeRunner(defaultConfig)
+      const startSpy = vi.fn()
+      runner.on('session:start', startSpy)
       
-      runnerWithDir.spawn()
-      
-      expect(spawn).toHaveBeenCalledWith(
-        'sh',
-        expect.any(Array),
-        expect.objectContaining({
-          cwd: '/workspace'
-        })
-      )
-    })
-
-    it('should add --continue flag if continueSession is true', () => {
-      const runnerWithContinue = new ClaudeRunner({
-        ...defaultConfig,
-        continueSession: true
-      })
-      
-      runnerWithContinue.spawn()
-      
-      const command = vi.mocked(spawn).mock.calls[0][1][1]
-      expect(command).toContain('--continue')
-    })
-
-    it('should add allowed tools if provided', () => {
-      const runnerWithTools = new ClaudeRunner({
-        ...defaultConfig,
-        allowedTools: ['Read', 'Write', 'Edit']
-      })
-      
-      runnerWithTools.spawn()
-      
-      const command = vi.mocked(spawn).mock.calls[0][1][1]
-      expect(command).toContain('--allowedTools Read Write Edit')
-    })
-
-    it('should throw error if process already running', () => {
-      runner.spawn()
-      expect(() => runner.spawn()).toThrow('Claude process already running')
-    })
-
-    it('should set up stdout data piping to parser', () => {
       runner.spawn()
       
-      const parser = (runner as any).parser
-      mockStdout.emit('data', Buffer.from('test data'))
+      expect(startSpy).toHaveBeenCalled()
+    })
+
+    it('should throw error if session already running', () => {
+      runner = new ClaudeRunner(defaultConfig)
+      runner.spawn()
       
-      expect(parser.processData).toHaveBeenCalledWith(Buffer.from('test data'))
+      expect(() => runner.spawn()).toThrowError('Claude session already running')
     })
   })
 
   describe('sendInput()', () => {
-    it('should send input with newline', async () => {
-      runner.spawn()
+    it('should throw error if no active session', async () => {
+      runner = new ClaudeRunner(defaultConfig)
       
-      await runner.sendInput('Hello Claude')
-      
-      expect(mockStdin.write).toHaveBeenCalledWith(
-        'Hello Claude\n',
-        expect.any(Function)
-      )
+      await expect(runner.sendInput('test')).rejects.toThrowError('No active Claude session')
     })
 
-    it('should handle multiline input', async () => {
+    it('should call SDK query with input', async () => {
+      runner = new ClaudeRunner(defaultConfig)
       runner.spawn()
       
-      const multilineInput = 'Line 1\nLine 2\nLine 3'
-      await runner.sendInput(multilineInput)
+      // Mock the SDK to complete immediately
+      mockQuery.mockImplementation(async function* () {
+        yield { type: 'result', result: 'test response' } as ClaudeMessage
+      })
       
-      expect(mockStdin.write).toHaveBeenCalledWith(
-        'Line 1\nLine 2\nLine 3\n',
-        expect.any(Function)
-      )
-    })
-
-    it('should throw error if no active process', async () => {
-      await expect(runner.sendInput('test')).rejects.toThrow('No active Claude process')
-    })
-
-    it('should reject on write error', async () => {
-      runner.spawn()
+      await runner.sendInput('test input')
       
-      const writeError = new Error('Write failed')
-      mockStdin.write.mockImplementation((data, cb) => cb(writeError))
-      
-      await expect(runner.sendInput('test')).rejects.toThrow('Write failed')
+      expect(mockQuery).toHaveBeenCalledWith({
+        prompt: 'test input',
+        abortController: expect.any(AbortController),
+        options: expect.objectContaining({
+          cwd: '/tmp/test'
+        })
+      })
     })
   })
 
   describe('sendInitialPrompt()', () => {
-    it('should send prompt and close stdin', async () => {
+    it('should call SDK query with prompt', async () => {
+      runner = new ClaudeRunner(defaultConfig)
       runner.spawn()
       
-      await runner.sendInitialPrompt('Initial prompt')
+      // Mock the SDK to complete immediately
+      mockQuery.mockImplementation(async function* () {
+        yield { type: 'result', result: 'test response' } as ClaudeMessage
+      })
       
-      expect(mockStdin.write).toHaveBeenCalled()
-      expect(mockStdin.end).toHaveBeenCalled()
+      await runner.sendInitialPrompt('test prompt')
+      
+      expect(mockQuery).toHaveBeenCalledWith({
+        prompt: 'test prompt',
+        abortController: expect.any(AbortController),
+        options: expect.objectContaining({
+          cwd: '/tmp/test'
+        })
+      })
     })
 
-    it('should throw error if no active process', async () => {
-      await expect(runner.sendInitialPrompt('test')).rejects.toThrow('No active Claude process')
+    it('should throw error if no active session', async () => {
+      runner = new ClaudeRunner(defaultConfig)
+      
+      await expect(runner.sendInitialPrompt('test')).rejects.toThrowError('No abort controller available')
     })
   })
 
   describe('kill()', () => {
-    it('should kill process with SIGTERM', () => {
+    it('should abort session and set running to false', () => {
+      runner = new ClaudeRunner(defaultConfig)
       runner.spawn()
-      runner.kill()
       
-      expect(mockProcess.kill).toHaveBeenCalledWith('SIGTERM')
-      expect((runner as any).process).toBeNull()
-      expect((runner as any).parser).toBeNull()
-    })
-
-    it('should be safe to call without active process', () => {
-      expect(() => runner.kill()).not.toThrow()
-    })
-
-    it('should be safe to call multiple times', () => {
-      runner.spawn()
+      expect(runner.isRunning()).toBe(true)
       runner.kill()
-      expect(() => runner.kill()).not.toThrow()
+      expect(runner.isRunning()).toBe(false)
     })
   })
 
   describe('isRunning()', () => {
-    it('should return true when process is running', () => {
+    it('should return false initially', () => {
+      runner = new ClaudeRunner(defaultConfig)
+      expect(runner.isRunning()).toBe(false)
+    })
+
+    it('should return true after spawn', () => {
+      runner = new ClaudeRunner(defaultConfig)
       runner.spawn()
       expect(runner.isRunning()).toBe(true)
     })
 
-    it('should return false when no process', () => {
-      expect(runner.isRunning()).toBe(false)
-    })
-
-    it('should return false when process is killed', () => {
+    it('should return false after kill', () => {
+      runner = new ClaudeRunner(defaultConfig)
       runner.spawn()
-      mockProcess.killed = true
+      runner.kill()
       expect(runner.isRunning()).toBe(false)
     })
   })
 
-  describe('Event Forwarding from Parser', () => {
-    let parser: any
-
-    beforeEach(() => {
+  describe('SDK Message Handling', () => {
+    it('should emit message events from SDK', async () => {
+      runner = new ClaudeRunner(defaultConfig)
       runner.spawn()
-      parser = (runner as any).parser
-    })
-
-    it('should forward message event as message', async () => {
-      const event: ClaudeEvent = {
-        type: 'assistant',
-        message: { content: [], role: 'assistant', type: 'message', id: '1', model: 'claude' }
-      }
       
-      const promise = new Promise<void>((resolve) => {
-        runner.on('message', (received) => {
-          expect(received).toEqual(event)
-          resolve()
-        })
-      })
+      const messageSpy = vi.fn()
+      runner.on('message', messageSpy)
       
-      parser.emit('message', event)
-      await promise
-    })
-
-    it('should forward assistant event unchanged', async () => {
-      const event: AssistantEvent = {
-        type: 'assistant',
-        message: { content: [], role: 'assistant', type: 'message', id: '1', model: 'claude' }
-      }
-      
-      const promise = new Promise<void>((resolve) => {
-        runner.on('assistant', (received) => {
-          expect(received).toEqual(event)
-          resolve()
-        })
-      })
-      
-      parser.emit('assistant', event)
-      await promise
-    })
-
-    it('should forward tool-use event unchanged', async () => {
-      const promise = new Promise<void>((resolve) => {
-        runner.on('tool-use', (toolName, input) => {
-          expect(toolName).toBe('Read')
-          expect(input).toEqual({ file_path: '/test.txt' })
-          resolve()
-        })
-      })
-      
-      parser.emit('tool-use', 'Read', { file_path: '/test.txt' })
-      await promise
-    })
-
-    it('should forward text event unchanged', async () => {
-      const promise = new Promise<void>((resolve) => {
-        runner.on('text', (text) => {
-          expect(text).toBe('Hello from Claude')
-          resolve()
-        })
-      })
-      
-      parser.emit('text', 'Hello from Claude')
-      await promise
-    })
-
-    it('should forward end-turn event unchanged', async () => {
-      const promise = new Promise<void>((resolve) => {
-        runner.on('end-turn', (lastText) => {
-          expect(lastText).toBe('Final message')
-          resolve()
-        })
-      })
-      
-      parser.emit('end-turn', 'Final message')
-      await promise
-    })
-
-    it('should forward result event unchanged', async () => {
-      const event: ResultEvent = {
-        type: 'result',
-        subtype: 'success',
-        is_error: false,
-        cost_usd: 0.15,
-        duration_ms: 5000
-      }
-      
-      const promise = new Promise<void>((resolve) => {
-        runner.on('result', (received) => {
-          expect(received).toEqual(event)
-          resolve()
-        })
-      })
-      
-      parser.emit('result', event)
-      await promise
-    })
-
-    it('should forward token-limit event unchanged', async () => {
-      const promise = new Promise<void>((resolve) => {
-        runner.on('token-limit', () => {
-          resolve()
-        })
-      })
-      
-      parser.emit('token-limit')
-      await promise
-    })
-
-    describe('Error handling', () => {
-      it('should forward Error instance unchanged', async () => {
-        const error = new Error('Parser error')
-        
-        const promise = new Promise<void>((resolve) => {
-          runner.on('error', (received) => {
-            expect(received).toBe(error)
-            resolve()
-          })
-        })
-        
-        parser.emit('error', error)
-        await promise
-      })
-
-      it('should convert ErrorEvent to Error', async () => {
-        const errorEvent: ErrorEvent = {
-          type: 'error',
-          message: 'API error occurred'
-        }
-        
-        const promise = new Promise<void>((resolve) => {
-          runner.on('error', (received) => {
-            expect(received).toBeInstanceOf(Error)
-            expect(received.message).toBe('API error occurred')
-            resolve()
-          })
-        })
-        
-        parser.emit('error', errorEvent)
-        await promise
-      })
-
-      it('should convert ToolErrorEvent to Error', async () => {
-        const toolError: ToolErrorEvent = {
-          type: 'tool_error',
-          error: 'File not found'
-        }
-        
-        const promise = new Promise<void>((resolve) => {
-          runner.on('error', (received) => {
-            expect(received).toBeInstanceOf(Error)
-            expect(received.message).toBe('File not found')
-            resolve()
-          })
-        })
-        
-        parser.emit('error', toolError)
-        await promise
-      })
-    })
-  })
-
-  describe('Process Event Handling', () => {
-    it('should handle process error event', async () => {
-      const promise = new Promise<void>((resolve) => {
-        runner.on('error', (error) => {
-          expect(error.message).toBe('Claude process error: spawn failed')
-          resolve()
-        })
-      })
-      
-      runner.spawn()
-      mockProcess.emit('error', new Error('spawn failed'))
-      await promise
-    })
-
-    it('should handle process exit event', async () => {
-      const promise = new Promise<void>((resolve) => {
-        runner.on('exit', (code) => {
-          expect(code).toBe(0)
-          resolve()
-        })
-      })
-      
-      runner.spawn()
-      mockProcess.emit('exit', 0)
-      await promise
-      
-      expect((runner as any).process).toBeNull()
-      expect((runner as any).parser).toBeNull()
-    })
-
-    it('should call parser.processEnd on exit', () => {
-      runner.spawn()
-      const parser = (runner as any).parser
-      
-      mockProcess.emit('exit', 0)
-      
-      expect(parser.processEnd).toHaveBeenCalled()
-    })
-
-    it('should handle stderr output', async () => {
-      const messages: string[] = []
-      let resolvePromise: () => void
-      const promise = new Promise<void>((resolve) => {
-        resolvePromise = resolve
-      })
-      
-      runner.on('error', (error) => {
-        messages.push(error.message)
-        if (messages.length === 2) {
-          expect(messages).toEqual([
-            'Claude stderr: Error line 1',
-            'Claude stderr: Error line 2'
-          ])
-          resolvePromise()
-        }
-      })
-      
-      runner.spawn()
-      mockStderr.emit('data', Buffer.from('Error line 1\nError line 2\n'))
-      await promise
-    })
-
-    it('should buffer partial stderr lines', async () => {
-      const promise = new Promise<void>((resolve) => {
-        runner.on('error', (error) => {
-          expect(error.message).toBe('Claude stderr: Complete error message')
-          resolve()
-        })
-      })
-      
-      runner.spawn()
-      mockStderr.emit('data', Buffer.from('Complete error '))
-      mockStderr.emit('data', Buffer.from('message\n'))
-      await promise
-    })
-
-    it('should ignore empty stderr lines', () => {
-      const errorHandler = vi.fn()
-      runner.on('error', errorHandler)
-      
-      runner.spawn()
-      mockStderr.emit('data', Buffer.from('\n  \n\t\n'))
-      
-      expect(errorHandler).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('Edge Cases', () => {
-    it('should handle process crash during operation', async () => {
-      let errorEmitted = false
-      
-      runner.on('error', () => {
-        errorEmitted = true
-      })
-      
-      const promise = new Promise<void>((resolve) => {
-        runner.on('exit', (code) => {
-          expect(code).toBe(1)
-          expect(errorEmitted).toBe(false) // No error event for clean exit
-          resolve()
-        })
-      })
-      
-      runner.spawn()
-      mockProcess.emit('exit', 1)
-      await promise
-    })
-
-    it('should handle stdin being null', async () => {
-      runner.spawn()
-      mockProcess.stdin = null
-      
-      await expect(runner.sendInput('test')).rejects.toThrow('No active Claude process')
-    })
-
-    it('should handle stdout being null', () => {
-      mockProcess.stdout = null
-      expect(() => runner.spawn()).not.toThrow()
-    })
-
-    it('should handle stderr being null', () => {
-      mockProcess.stderr = null
-      expect(() => runner.spawn()).not.toThrow()
-    })
-  })
-
-  describe('Complex Scenarios', () => {
-    it('should handle full conversation flow', async () => {
-      const events: any[] = []
-      
-      runner.on('message', (e) => events.push({ type: 'message', data: e }))
-      runner.on('assistant', (e) => events.push({ type: 'assistant', data: e }))
-      runner.on('text', (t) => events.push({ type: 'text', data: t }))
-      runner.on('end-turn', (t) => events.push({ type: 'end-turn', data: t }))
-      runner.on('result', (e) => events.push({ type: 'result', data: e }))
-      
-      runner.spawn()
-      const parser = (runner as any).parser
-      
-      // Send initial prompt
-      await runner.sendInitialPrompt('Hello Claude')
-      
-      // Simulate Claude's response
-      const assistantEvent: AssistantEvent = {
+      const testMessage: ClaudeMessage = {
         type: 'assistant',
         message: {
-          id: '1',
+          id: 'test',
           type: 'message',
           role: 'assistant',
-          model: 'claude-3',
-          content: [{ type: 'text', text: 'Hello! How can I help?' }],
-          stop_reason: 'end_turn'
-        }
+          model: 'claude-3-sonnet',
+          content: [{ type: 'text', text: 'Hello' }]
+        },
+        session_id: 'test-session'
       }
       
-      parser.emit('message', assistantEvent)
-      parser.emit('assistant', assistantEvent)
-      parser.emit('text', 'Hello! How can I help?')
-      parser.emit('end-turn', 'Hello! How can I help?')
+      // Mock SDK to yield our test message
+      mockQuery.mockImplementation(async function* () {
+        yield testMessage
+      })
       
-      const resultEvent: ResultEvent = {
-        type: 'result',
-        subtype: 'success',
-        is_error: false
-      }
-      parser.emit('result', resultEvent)
+      await runner.sendInput('test')
       
-      // Process should exit
-      mockProcess.emit('exit', 0)
-      
-      // Verify event sequence
-      expect(events).toHaveLength(5)
-      expect(events[0].type).toBe('message')
-      expect(events[1].type).toBe('assistant')
-      expect(events[2].type).toBe('text')
-      expect(events[3].type).toBe('end-turn')
-      expect(events[4].type).toBe('result')
+      expect(messageSpy).toHaveBeenCalledWith(testMessage)
     })
 
-    it('should handle tool use scenario', async () => {
-      const toolUses: any[] = []
-      let resolvePromise: () => void
-      const promise = new Promise<void>((resolve) => {
-        resolvePromise = resolve
-      })
-      
-      runner.on('tool-use', (name, input) => {
-        toolUses.push({ name, input })
-        
-        if (toolUses.length === 2) {
-          expect(toolUses).toEqual([
-            { name: 'Read', input: { file_path: '/file1.txt' } },
-            { name: 'Write', input: { file_path: '/file2.txt', content: 'Hello' } }
-          ])
-          resolvePromise()
-        }
-      })
-      
+    it('should emit session:end when SDK completes', async () => {
+      runner = new ClaudeRunner(defaultConfig)
       runner.spawn()
-      const parser = (runner as any).parser
       
-      parser.emit('tool-use', 'Read', { file_path: '/file1.txt' })
-      parser.emit('tool-use', 'Write', { file_path: '/file2.txt', content: 'Hello' })
-      await promise
+      const endSpy = vi.fn()
+      runner.on('session:end', endSpy)
+      
+      // Mock SDK to complete immediately
+      mockQuery.mockImplementation(async function* () {
+        yield { type: 'result', result: 'completed' } as ClaudeMessage
+      })
+      
+      await runner.sendInput('test')
+      
+      expect(endSpy).toHaveBeenCalledWith(0)
+    })
+
+    it('should emit session:error when SDK throws', async () => {
+      runner = new ClaudeRunner(defaultConfig)
+      runner.spawn()
+      
+      const errorSpy = vi.fn()
+      runner.on('session:error', errorSpy)
+      
+      const testError = new Error('SDK error')
+      mockQuery.mockImplementation(async function* () {
+        throw testError
+      })
+      
+      await runner.sendInput('test')
+      
+      expect(errorSpy).toHaveBeenCalledWith(testError)
+    })
+  })
+
+  describe('Configuration', () => {
+    it('should pass SDK options to query', async () => {
+      const config: ClaudeRunnerConfig = {
+        workingDirectory: '/custom/dir',
+        allowedTools: ['Read', 'Write'],
+        maxTurns: 5,
+        continueSession: true,
+        sdkOptions: {
+          model: 'claude-3-opus'
+        }
+      }
+      
+      runner = new ClaudeRunner(config)
+      runner.spawn()
+      
+      mockQuery.mockImplementation(async function* () {
+        yield { type: 'result', result: 'test' } as ClaudeMessage
+      })
+      
+      await runner.sendInput('test')
+      
+      expect(mockQuery).toHaveBeenCalledWith({
+        prompt: 'test',
+        abortController: expect.any(AbortController),
+        options: expect.objectContaining({
+          cwd: '/custom/dir',
+          allowedTools: ['Read', 'Write'],
+          maxTurns: 5,
+          continue: true,
+          model: 'claude-3-opus'
+        })
+      })
     })
   })
 })
