@@ -10,8 +10,28 @@ import { URL } from 'url'
 import open from 'open'
 import readline from 'readline'
 
-// Load environment variables
-dotenv.config({ path: '.env.cyrus' })
+// Parse command line arguments
+const args = process.argv.slice(2)
+const envFileArg = args.find(arg => arg.startsWith('--env-file='))
+
+// Handle --version argument
+if (args.includes('--version')) {
+  try {
+    const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
+    console.log(pkg.version)
+  } catch {
+    console.log('0.1.3') // fallback version
+  }
+  process.exit(0)
+}
+
+// Load environment variables only if --env-file is specified
+if (envFileArg) {
+  const envFile = envFileArg.split('=')[1]
+  dotenv.config({ path: envFile })
+}
+
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -27,32 +47,32 @@ class EdgeApp {
   
   /**
    * Load edge configuration (credentials and repositories)
+   * Note: Strips promptTemplatePath from all repositories to ensure built-in template is used
    */
   loadEdgeConfig() {
     const edgeConfigPath = './.edge-config.json'
+    let config = { repositories: [] }
+    
     if (existsSync(edgeConfigPath)) {
       try {
-        return JSON.parse(readFileSync(edgeConfigPath, 'utf-8'))
+        config = JSON.parse(readFileSync(edgeConfigPath, 'utf-8'))
       } catch (e) {
         console.error('Failed to load edge config:', e.message)
       }
     }
     
-    // Check for repositories.json for backward compatibility
-    const configPath = process.env.REPOSITORIES_CONFIG_PATH || './repositories.json'
-    try {
-      const configContent = readFileSync(resolve(configPath), 'utf-8')
-      const config = JSON.parse(configContent)
-      
-      if (config.repositories && config.repositories.length > 0) {
-        console.log(`Loaded ${config.repositories.length} repository configurations from ${configPath}`)
-        return { repositories: config.repositories }
-      }
-    } catch (error) {
-      // No config file found
+    // Strip promptTemplatePath from all repositories to ensure built-in template is used
+    if (config.repositories) {
+      config.repositories = config.repositories.map(repo => {
+        const { promptTemplatePath, ...repoWithoutTemplate } = repo
+        if (promptTemplatePath) {
+          console.log(`Ignoring custom prompt template for repository: ${repo.name} (using built-in template)`)
+        }
+        return repoWithoutTemplate
+      })
     }
     
-    return { repositories: [] }
+    return config
   }
   
   /**
@@ -85,9 +105,7 @@ class EdgeApp {
       const baseBranch = await question('Base branch (default: main): ') || 'main'
       const workspaceBaseDir = await question(`Workspace directory (default: ${repositoryPath}/workspaces): `) || `${repositoryPath}/workspaces`
       
-      console.log('\n📝 Prompt Template (optional)')
-      console.log('Leave blank to use the built-in default template')
-      const promptTemplatePath = await question('Custom prompt template path (press Enter to skip): ')
+      // Note: Prompt template is now hardcoded - no longer configurable
       
       // Ask for allowed tools configuration
       console.log('\n🔧 Tool Configuration')
@@ -116,7 +134,6 @@ class EdgeApp {
         linearToken: linearCredentials.linearToken,
         workspaceBaseDir: resolve(workspaceBaseDir),
         isActive: true,
-        ...(promptTemplatePath && { promptTemplatePath: resolve(promptTemplatePath) }),
         ...(allowedTools && { allowedTools })
       }
       
@@ -256,15 +273,8 @@ class EdgeApp {
    */
   async start() {
     try {
-      // Validate proxy URL
-      const proxyUrl = process.env.PROXY_URL
-      if (!proxyUrl) {
-        console.error('❌ PROXY_URL environment variable is required')
-        console.log('\nPlease add the following to your .env.cyrus file:')
-        console.log('PROXY_URL=https://cyrus-proxy.ceedar.workers.dev')
-        console.log('\nThis connects to the secure public Cyrus proxy for Linear OAuth and webhooks.')
-        process.exit(1)
-      }
+      // Set proxy URL with default
+      const proxyUrl = process.env.PROXY_URL || 'https://cyrus-proxy.ceedar.workers.dev'
       
       // Note: No longer need to validate Claude CLI since we use the SDK directly
       
