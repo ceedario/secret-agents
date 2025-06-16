@@ -13,6 +13,11 @@ The cyrus agent is a Linear-Claude integration that monitors issues, creates git
 
 ## Git Workflow
 
+**On startup, always update submodules to the latest SHA of the main branch:**
+```bash
+git submodule update --remote --merge
+```
+
 When making changes to either submodule:
 1. Commit and push changes within the submodule
 2. Return to the parent repository and commit the submodule updates
