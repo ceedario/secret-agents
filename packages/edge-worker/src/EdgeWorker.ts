@@ -926,14 +926,16 @@ Please analyze this issue and help implement a solution.`
         filter: { team: { id: { eq: team.id } } }
       })
       
-      const states = await teamStates.nodes
+      const states = await teamStates
       
-      // Find the first state with type 'started'
-      const startedState = states.find((state: any) => state.type === 'started')
+      // Find all states with type "started" and pick the one with lowest position
+      // This ensures we pick "In Progress" over "In Review" when both have type "started"
+      // Linear uses standardized state types: triage, backlog, unstarted, started, completed, canceled
+      const startedStates = states.nodes.filter(state => state.type === 'started')
+      const startedState = startedStates.sort((a, b) => a.position - b.position)[0]
       
       if (!startedState) {
-        console.warn(`No 'started' state found for team ${team.name || 'unknown'}, skipping state update`)
-        return
+        throw new Error('Could not find a state with type "started" for this team')
       }
 
       // Update the issue state
