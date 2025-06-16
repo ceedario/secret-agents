@@ -18,6 +18,8 @@ The cyrus agent is a Linear-Claude integration that monitors issues, creates git
 git submodule update --remote --merge
 ```
 
+**Branch synchronization:** When working on feature branches, ensure submodule branch names match the parent repository branch name to maintain consistency across the project.
+
 When making changes to either submodule:
 1. Commit and push changes within the submodule
 2. Return to the parent repository and commit the submodule updates
