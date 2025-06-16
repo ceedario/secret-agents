@@ -22,5 +22,6 @@ git submodule update --remote --merge
 
 When making changes to either submodule:
 1. Commit and push changes within the submodule
-2. Return to the parent repository and commit the submodule updates
-3. Push the parent repository changes to keep everything synchronized
+2. Create pull requests for the submodule repositories (not the parent repository)
+3. After submodule PRs are merged, return to the parent repository and commit the submodule updates
+4. Push the parent repository changes to keep everything synchronized
