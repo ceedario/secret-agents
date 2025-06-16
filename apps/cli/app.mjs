@@ -288,6 +288,42 @@ class EdgeApp {
   }
   
   /**
+   * Start the EdgeWorker with given configuration
+   */
+  async startEdgeWorker({ proxyUrl, repositories }) {
+    // Create EdgeWorker configuration
+    const config = {
+      proxyUrl,
+      repositories,
+      defaultAllowedTools: process.env.ALLOWED_TOOLS?.split(',').map(t => t.trim()) || [],
+      features: {
+        enableContinuation: true
+      },
+      handlers: {
+        createWorkspace: async (issue, repository) => {
+          return this.createGitWorktree(issue, repository)
+        }
+      }
+    }
+    
+    // Create and start EdgeWorker
+    this.edgeWorker = new EdgeWorker(config)
+    
+    // Set up event handlers
+    this.setupEventHandlers()
+    
+    // Start the worker
+    await this.edgeWorker.start()
+    
+    console.log('\n✅ Edge worker started successfully')
+    console.log(`Connected to proxy: ${config.proxyUrl}`)
+    console.log(`Managing ${repositories.length} repositories:`)
+    repositories.forEach(repo => {
+      console.log(`  - ${repo.name} (${repo.repositoryPath})`)
+    })
+  }
+
+  /**
    * Start the edge application
    */
   async start() {
@@ -305,6 +341,50 @@ class EdgeApp {
         console.log(`👉 To authorize Linear (new workspace or re-auth):`)
         console.log(`   ${proxyUrl}/oauth/authorize?callback=http://localhost:${oauthPort}/callback`)
         console.log('─'.repeat(70))
+        
+        // Set up handler for OAuth completions to automatically trigger repository setup
+        this.onOAuthComplete = async (linearCredentials) => {
+          if (this.edgeWorker) {
+            // If edge worker is already running, just set up a new repository
+            console.log('\n📋 Setting up new repository for workspace:', linearCredentials.linearWorkspaceName)
+            console.log('─'.repeat(50))
+            
+            try {
+              const newRepo = await this.setupRepositoryWizard(linearCredentials)
+              
+              // Add to existing repositories
+              let edgeConfig = this.loadEdgeConfig()
+              console.log(`📊 Current config has ${edgeConfig.repositories?.length || 0} repositories`)
+              edgeConfig.repositories = [...(edgeConfig.repositories || []), newRepo]
+              console.log(`📊 Adding repository "${newRepo.name}", new total: ${edgeConfig.repositories.length}`)
+              this.saveEdgeConfig(edgeConfig)
+              
+              console.log('\n✅ Repository configured successfully!')
+              console.log('📝 .edge-config.json file has been updated with your new repository configuration.')
+              console.log('💡 You can edit this file and restart Cyrus at any time to modify settings.')
+              
+              // Restart edge worker with new config
+              await this.edgeWorker.stop()
+              this.edgeWorker = null
+              
+              // Give a small delay to ensure file is written
+              await new Promise(resolve => setTimeout(resolve, 100))
+              
+              // Reload configuration and restart worker without going through setup
+              const updatedConfig = this.loadEdgeConfig()
+              console.log(`\n🔄 Reloading with ${updatedConfig.repositories?.length || 0} repositories from config file`)
+              
+              const proxyUrl = process.env.PROXY_URL || 'https://cyrus-proxy.ceedar.workers.dev'
+              return this.startEdgeWorker({ 
+                proxyUrl, 
+                repositories: updatedConfig.repositories || [] 
+              })
+              
+            } catch (error) {
+              console.error('\n❌ Repository setup failed:', error.message)
+            }
+          }
+        }
       }
       
       // Load edge configuration
@@ -315,13 +395,13 @@ class EdgeApp {
       const needsSetup = repositories.length === 0
       const hasLinearCredentials = repositories.some(r => r.linearToken) || process.env.LINEAR_OAUTH_TOKEN
       
-      if (needsSetup || process.argv.includes('--setup')) {
+      if (needsSetup) {
         console.log('🚀 Welcome to Cyrus Edge Worker!')
         
         // Check if they want to use existing credentials or add new workspace
         let linearCredentials
         
-        if (hasLinearCredentials && !process.argv.includes('--new-workspace')) {
+        if (hasLinearCredentials) {
           // Show available workspaces from existing repos
           const workspaces = new Map()
           for (const repo of (edgeConfig.repositories || [])) {
@@ -372,7 +452,7 @@ class EdgeApp {
               console.log(`Using workspace: ${linearCredentials.linearWorkspaceName}`)
             } else {
               // Get new credentials
-              process.argv.push('--new-workspace')
+              linearCredentials = null
             }
           } else if (process.env.LINEAR_OAUTH_TOKEN) {
             // Use env vars
@@ -384,7 +464,7 @@ class EdgeApp {
           }
           
           if (linearCredentials) {
-            console.log('(Run with --new-workspace to connect a different workspace)')
+            console.log('(Use the authorization link above to connect a different workspace)')
           }
         } else {
           // Get new Linear credentials
@@ -417,6 +497,8 @@ class EdgeApp {
           this.saveEdgeConfig(edgeConfig)
           
           console.log('\n✅ Repository configured successfully!')
+          console.log('📝 .edge-config.json file has been updated with your repository configuration.')
+          console.log('💡 You can edit this file and restart Cyrus at any time to modify settings.')
           
           // Ask if they want to add another
           const rl = readline.createInterface({
@@ -431,8 +513,7 @@ class EdgeApp {
           })
           
           if (addAnother) {
-            // Restart with --setup flag
-            process.argv.push('--setup')
+            // Restart setup flow
             return this.start()
           }
         } catch (error) {
@@ -444,41 +525,12 @@ class EdgeApp {
       // Validate we have repositories
       if (repositories.length === 0) {
         console.error('❌ No repositories configured')
-        console.log('\nRun with --setup flag to configure:')
-        console.log('pnpm run edge -- --setup')
+        console.log('\nUse the authorization link above to configure your first repository.')
         process.exit(1)
       }
       
-      // Create EdgeWorker configuration
-      const config = {
-        proxyUrl,
-        repositories,
-        defaultAllowedTools: process.env.ALLOWED_TOOLS?.split(',').map(t => t.trim()) || [],
-        features: {
-          enableContinuation: true
-        },
-        handlers: {
-          createWorkspace: async (issue, repository) => {
-            return this.createGitWorktree(issue, repository)
-          }
-        }
-      }
-      
-      // Create and start EdgeWorker
-      this.edgeWorker = new EdgeWorker(config)
-      
-      // Set up event handlers
-      this.setupEventHandlers()
-      
-      // Start the worker
-      await this.edgeWorker.start()
-      
-      console.log('\n✅ Edge worker started successfully')
-      console.log(`Connected to proxy: ${config.proxyUrl}`)
-      console.log(`Managing ${repositories.length} repositories:`)
-      repositories.forEach(repo => {
-        console.log(`  - ${repo.name} (${repo.repositoryPath})`)
-      })
+      // Start the edge worker
+      await this.startEdgeWorker({ proxyUrl, repositories })
       
       // Handle graceful shutdown
       process.on('SIGINT', () => this.shutdown())
