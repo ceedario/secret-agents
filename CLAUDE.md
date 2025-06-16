@@ -10,3 +10,10 @@ This repository contains two submodules:
 - `cyrus-website/` - Marketing website and payment flow (Next.js)
 
 The cyrus agent is a Linear-Claude integration that monitors issues, creates git worktrees, runs Claude Code sessions, and posts responses back to Linear. The website handles marketing, user onboarding, and payment processing.
+
+## Git Workflow
+
+When making changes to either submodule:
+1. Commit and push changes within the submodule
+2. Return to the parent repository and commit the submodule updates
+3. Push the parent repository changes to keep everything synchronized
