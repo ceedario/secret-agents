@@ -1,0 +1,6 @@
+[submodule "cyrus-website"]
+	path = cyrus-website
+	url = git@github.com:ceedarai/cyrus-website.git
+[submodule "cyrus"]
+	path = cyrus
+	url = https://github.com/ceedaragents/cyrus.git
