@@ -432,7 +432,7 @@ describe('EdgeWorker', () => {
       // The initial comment should be the only one posted
       expect(mockLinearClient.createComment).toHaveBeenCalledWith({
         issueId: 'issue-123',
-        body: "I've been assigned to this issue and am getting started right away. I'll update this comment with my plan shortly."
+        body: "I'll get started right away. I'll update this comment with my plan shortly."
       })
 
       // Should emit message events
