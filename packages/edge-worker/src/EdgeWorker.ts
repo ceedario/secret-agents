@@ -968,7 +968,7 @@ Please analyze this issue and help implement a solution.`
    */
   private async postInitialComment(issueId: string, repositoryId: string): Promise<Comment | null> {
     try {
-      const body = "I've been assigned to this issue and am getting started right away. I'll update this comment with my plan shortly."
+      const body = "I'll get started right away. I'll update this comment with my plan shortly."
       
       // Get the Linear client for this repository
       const linearClient = this.linearClients.get(repositoryId)
@@ -1053,7 +1053,7 @@ Please analyze this issue and help implement a solution.`
 
       // Convert todos to Linear checklist format
       const checklist = this.formatTodosAsChecklist(todos)
-      const body = `I've been assigned to this issue and am getting started right away. Here's my plan:\n\n${checklist}`
+      const body = `I'll get started right away. Here's my plan:\n\n${checklist}`
 
       // Get the Linear client
       const linearClient = this.linearClients.get(repositoryId)
