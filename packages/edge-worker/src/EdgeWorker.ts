@@ -518,8 +518,9 @@ export class EdgeWorker extends EventEmitter {
       // Store new runner
       this.claudeRunners.set(issue.id, runner)
 
-      // Start continuation session with the comment as prompt
-      await runner.start(comment.body || '')
+      // Start continuation session with proper context
+      const fullPrompt = await this.buildContinuationPrompt(fullIssue, comment, repository)
+      await runner.start(fullPrompt)
     } catch (error) {
       console.error('Failed to continue conversation, starting fresh:', error)
       // Remove any partially created session
@@ -846,6 +847,51 @@ Working directory: ${repository.repositoryPath}
 Base branch: ${repository.baseBranch}
 
 Please analyze this issue and help implement a solution.`
+    }
+  }
+
+  /**
+   * Build continuation prompt for new comments with full context
+   * @param issue Full Linear issue object
+   * @param comment Linear comment object from webhook data
+   * @param repository Repository configuration
+   */
+  private async buildContinuationPrompt(issue: LinearIssue, comment: LinearWebhookComment, repository: RepositoryConfig): Promise<string> {
+    console.log(`[EdgeWorker] Building continuation prompt for issue ${issue.identifier}`)
+    
+    try {
+      // Get the current state
+      const state = await issue.state
+      const stateName = state?.name || 'Unknown'
+      
+      // Build a simplified context prompt that provides essential information
+      // while keeping the user's comment as the main focus
+      const contextPrompt = `## Current Context
+
+**Repository**: ${repository.name}
+**Issue**: ${issue.identifier} - ${issue.title || ''}
+**State**: ${stateName}
+**Working Directory**: ${this.config.handlers?.createWorkspace ? 
+  'Will be created based on issue' : repository.repositoryPath}
+**Base Branch**: ${repository.baseBranch}
+
+## Latest Request
+
+${comment.body || ''}
+
+Please continue working on this issue based on the request above. Use the TodoWrite tool to track your tasks and provide updates as you work.`
+
+      console.log(`[EdgeWorker] Continuation prompt built, length: ${contextPrompt.length} characters`)
+      return contextPrompt
+    } catch (error) {
+      console.error('[EdgeWorker] Failed to build continuation prompt:', error)
+      
+      // Fallback to just the comment body with minimal context
+      return `Please help with the following request on issue ${issue.identifier}:
+
+${comment.body || ''}
+
+Please analyze this request and help implement a solution.`
     }
   }
 

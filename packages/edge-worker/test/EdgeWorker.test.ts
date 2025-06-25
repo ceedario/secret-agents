@@ -357,8 +357,9 @@ describe('EdgeWorker', () => {
       const webhook = mockCommentWebhook({}, { body: '@cyrus please help with this' })
       await webhookHandler(webhook)
 
-      // Should start new session with comment as prompt
-      expect(mockClaudeRunner.start).toHaveBeenCalledWith('@cyrus please help with this')
+      // Should start new session with continuation prompt
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('@cyrus please help with this'))
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('## Current Context'))
     })
 
     it('should handle issue unassignment', async () => {
@@ -613,8 +614,9 @@ describe('EdgeWorker', () => {
       })
       await webhookHandler(webhook)
 
-      // Should start Claude session since agent is mentioned
-      expect(mockClaudeRunner.start).toHaveBeenCalledWith('Hey @cyrus, can you help with this?')
+      // Should start Claude session with continuation prompt
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('Hey @cyrus, can you help with this?'))
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('## Current Context'))
     })
 
     it('should trigger when agent is mentioned by display name', async () => {
@@ -628,8 +630,9 @@ describe('EdgeWorker', () => {
       })
       await webhookHandler(webhook)
 
-      // Should start Claude session since agent is mentioned
-      expect(mockClaudeRunner.start).toHaveBeenCalledWith('Hey @"Cyrus Agent", can you help with this?')
+      // Should start Claude session with continuation prompt
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('Hey @"Cyrus Agent", can you help with this?'))
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('## Current Context'))
     })
 
     it('should trigger when agent is mentioned by user ID', async () => {
@@ -643,8 +646,9 @@ describe('EdgeWorker', () => {
       })
       await webhookHandler(webhook)
 
-      // Should start Claude session since agent is mentioned
-      expect(mockClaudeRunner.start).toHaveBeenCalledWith('Hey @cyrus-user-id, can you help with this?')
+      // Should start Claude session with continuation prompt
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('Hey @cyrus-user-id, can you help with this?'))
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('## Current Context'))
     })
 
     it('should NOT trigger when only other users are mentioned', async () => {
@@ -688,8 +692,9 @@ describe('EdgeWorker', () => {
       })
       await webhookHandler(webhook)
 
-      // Should start Claude session since agent is mentioned (even with others)
-      expect(mockClaudeRunner.start).toHaveBeenCalledWith('Hey @john, @cyrus, and @jane, can you all help with this?')
+      // Should start Claude session with continuation prompt
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('Hey @john, @cyrus, and @jane, can you all help with this?'))
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('## Current Context'))
     })
 
     it('should be case-insensitive when checking mentions by name', async () => {
@@ -703,8 +708,9 @@ describe('EdgeWorker', () => {
       })
       await webhookHandler(webhook)
 
-      // Should start Claude session since agent is mentioned (case-insensitive)
-      expect(mockClaudeRunner.start).toHaveBeenCalledWith('Hey @CYRUS, can you help with this?')
+      // Should start Claude session with continuation prompt
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('Hey @CYRUS, can you help with this?'))
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('## Current Context'))
     })
 
     it('should still work when viewer information is unavailable', async () => {
@@ -722,7 +728,8 @@ describe('EdgeWorker', () => {
       await webhookHandler(webhook)
 
       // Should err on the side of caution and trigger when viewer info is unavailable
-      expect(mockClaudeRunner.start).toHaveBeenCalledWith('Hey @cyrus, can you help with this?')
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('Hey @cyrus, can you help with this?'))
+      expect(mockClaudeRunner.start).toHaveBeenCalledWith(expect.stringContaining('## Current Context'))
     })
 
     it('should NOT trigger when Linear client is unavailable', async () => {
