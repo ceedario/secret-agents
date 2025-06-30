@@ -150,6 +150,10 @@ describe('EdgeWorker', () => {
       expect(vi.mocked(NdjsonClient)).toHaveBeenCalledWith({
         proxyUrl: mockConfig.proxyUrl,
         token: 'test-linear-oauth-token',
+        transport: 'webhook',
+        webhookPort: expect.any(Number),
+        webhookPath: '/webhook',
+        webhookHost: 'localhost',
         onConnect: expect.any(Function),
         onDisconnect: expect.any(Function),
         onError: expect.any(Function)

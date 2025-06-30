@@ -138,3 +138,13 @@ export class TokenEncryption {
       .join('')
   }
 }
+
+/**
+ * Generate a secure random secret for webhook signing
+ */
+export function generateSecureSecret(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32))
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}

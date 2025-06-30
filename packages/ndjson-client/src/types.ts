@@ -53,6 +53,11 @@ export interface StatusUpdate {
 export interface NdjsonClientConfig {
   proxyUrl: string
   token: string
+  transport: 'webhook'
+  webhookPort?: number
+  webhookPath?: string
+  webhookHost?: string
+  webhookBaseUrl?: string
   maxReconnectAttempts?: number
   reconnectBaseDelay?: number
   reconnectOnStreamEnd?: boolean

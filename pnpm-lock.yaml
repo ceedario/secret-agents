@@ -102,6 +102,9 @@ importers:
       cyrus-core:
         specifier: workspace:*
         version: link:../../packages/core
+      cyrus-ndjson-client:
+        specifier: workspace:*
+        version: link:../../packages/ndjson-client
       electron-conf:
         specifier: ^1.3.0
         version: 1.3.0(electron@36.4.0)

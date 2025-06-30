@@ -2,10 +2,7 @@ import { Router } from 'itty-router'
 import type { Env, LinearWebhook } from './types'
 import { OAuthService } from './services/OAuthService'
 import { WebhookReceiver } from './services/WebhookReceiver'
-import { EventStreamer } from './services/EventStreamer'
-
-// Export Durable Object
-export { EventStreamDurableObject } from './services/EventStreamDurableObject'
+import { WebhookSender } from './services/WebhookSender'
 
 const router = Router()
 
@@ -47,8 +44,8 @@ router.get('/', (request: Request, env: Env) => {
       </div>
       
       <div class="endpoint">
-        <span class="method">GET</span> /events/stream
-        <p>NDJSON event stream for edge workers</p>
+        <span class="method">POST</span> /edge/register
+        <p>Register edge worker webhook endpoint</p>
       </div>
       
       <div class="endpoint">
@@ -79,7 +76,7 @@ router.get('/oauth/callback', async (request: Request, env: Env) => {
 
 // Webhook route
 router.post('/webhook', async (request: Request, env: Env, ctx: ExecutionContext) => {
-  const eventStreamer = new EventStreamer(env)
+  const webhookSender = new WebhookSender(env)
   
   const webhookReceiver = new WebhookReceiver(env, async (webhook: LinearWebhook) => {
     // Extract workspace ID from webhook
@@ -91,28 +88,47 @@ router.post('/webhook', async (request: Request, env: Env, ctx: ExecutionContext
     }
     
     // Transform webhook to event
-    const event = eventStreamer.transformWebhookToEvent(webhook)
+    const event = webhookSender.transformWebhookToEvent(webhook)
     
-    // Broadcast to edges in the background
+    // Send to edge workers in the background
     ctx.waitUntil(
-      eventStreamer.broadcastToWorkspace(event, workspaceId)
-        .then(count => console.log(`Webhook for workspace ${workspaceId} forwarded to ${count} edge worker(s)`))
-        .catch(error => console.error('Failed to broadcast webhook:', error))
+      webhookSender.sendWebhookToWorkspace(event, workspaceId)
+        .then(count => console.log(`Webhook for workspace ${workspaceId} sent to ${count} edge worker(s)`))
+        .catch(error => console.error('Failed to send webhook:', error))
     )
   })
   
   return webhookReceiver.handleWebhook(request)
 })
 
-// Event streaming routes
-router.get('/events/stream', async (request: Request, env: Env) => {
-  const eventStreamer = new EventStreamer(env)
-  return eventStreamer.handleStream(request)
+// Edge worker registration route
+router.post('/edge/register', async (request: Request, env: Env) => {
+  try {
+    const webhookSender = new WebhookSender(env)
+    const registry = webhookSender.getRegistry()
+    
+    const registration = await request.json()
+    const result = await registry.registerEdgeWorker(registration)
+    
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } catch (error) {
+    console.error('Edge worker registration failed:', error)
+    return new Response(JSON.stringify({ 
+      error: error instanceof Error ? error.message : 'Registration failed' 
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  }
 })
 
+// Status update route
 router.post('/events/status', async (request: Request, env: Env) => {
-  const eventStreamer = new EventStreamer(env)
-  return eventStreamer.handleStatus(request)
+  const webhookSender = new WebhookSender(env)
+  return webhookSender.handleStatusUpdate(request)
 })
 
 // 404 handler

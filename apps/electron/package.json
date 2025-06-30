@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "cyrus-core": "workspace:*",
+    "cyrus-ndjson-client": "workspace:*",
     "@radix-ui/react-checkbox": "^1.3.2",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-radio-group": "^1.3.7",

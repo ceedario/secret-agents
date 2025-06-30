@@ -242,11 +242,11 @@ async function connectToProxy() {
     }
   })
   
-  ndjsonClient.on('connected', () => {
+  ndjsonClient.on('connect', () => {
     mainWindow?.webContents.send('proxy-connected')
   })
   
-  ndjsonClient.on('disconnected', () => {
+  ndjsonClient.on('disconnect', () => {
     mainWindow?.webContents.send('proxy-disconnected')
   })
   

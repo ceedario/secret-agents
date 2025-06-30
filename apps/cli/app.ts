@@ -321,6 +321,7 @@ class EdgeApp {
       proxyUrl,
       repositories,
       defaultAllowedTools: process.env.ALLOWED_TOOLS?.split(',').map(t => t.trim()) || [],
+      webhookBaseUrl: process.env.CYRUS_WEBHOOK_BASE_URL,
       features: {
         enableContinuation: true
       },

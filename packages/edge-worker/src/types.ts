@@ -36,6 +36,7 @@ export interface RepositoryConfig {
 export interface EdgeWorkerConfig {
   // Proxy connection config
   proxyUrl: string
+  webhookBaseUrl?: string
   
   // Claude config (shared across all repos)
   defaultAllowedTools?: string[]

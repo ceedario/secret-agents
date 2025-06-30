@@ -77,6 +77,11 @@ export class EdgeWorker extends EventEmitter {
       const ndjsonClient = new NdjsonClient({
         proxyUrl: config.proxyUrl,
         token: token,
+        transport: 'webhook',
+        webhookPort: 3000 + Math.floor(Math.random() * 1000),
+        webhookPath: '/webhook',
+        webhookHost: 'localhost',
+        ...(config.webhookBaseUrl && { webhookBaseUrl: config.webhookBaseUrl }),
         onConnect: () => this.handleConnect(token),
         onDisconnect: (reason) => this.handleDisconnect(token, reason),
         onError: (error) => this.handleError(error)
