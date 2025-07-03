@@ -71,6 +71,32 @@ class EdgeApp {
   private onOAuthComplete?: (credentials: LinearCredentials) => Promise<void>
 
   /**
+   * Get the OAuth callback URL with proper port handling
+   */
+  private static get CALLBACK_URL(): string {
+    const port = parseInt(process.env.CYRUS_OAUTH_CALLBACK_PORT || '3457', 10)
+    const baseUrl = process.env.CYRUS_OAUTH_CALLBACK_BASE_URL
+    
+    if (baseUrl) {
+      // If custom base URL is provided, check if it already includes a port
+      // If not, and a port override is specified, use the override
+      try {
+        const url = new URL(baseUrl)
+        // If no port is specified in the URL and we have a port override, use it
+        if (!url.port && process.env.CYRUS_OAUTH_CALLBACK_PORT) {
+          url.port = port.toString()
+        }
+        return url.toString().replace(/\/$/, '') // Remove trailing slash
+      } catch {
+        // If URL parsing fails, fall back to localhost with port
+        return `http://localhost:${port}`
+      }
+    }
+    
+    return `http://localhost:${port}`
+  }
+
+  /**
    * Load edge configuration (credentials and repositories)
    * Note: Strips promptTemplatePath from all repositories to ensure built-in template is used
    */
@@ -289,8 +315,7 @@ class EdgeApp {
       this.oauthCallbacks.set(flowId, { resolve, reject, id: flowId })
       
       // Construct OAuth URL with callback
-      const callbackBaseUrl = process.env.CYRUS_OAUTH_CALLBACK_BASE_URL || `http://localhost:${port}`
-      const authUrl = `${proxyUrl}/oauth/authorize?callback=${callbackBaseUrl}/callback`
+      const authUrl = `${proxyUrl}/oauth/authorize?callback=${EdgeApp.CALLBACK_URL}/callback`
       
       console.log(`\n👉 Opening your browser to authorize with Linear...`)
       console.log(`If the browser doesn't open, visit: ${authUrl}`)
@@ -361,12 +386,11 @@ class EdgeApp {
       
       // Start OAuth server immediately for easy access
       const oauthPort = parseInt(process.env.CYRUS_OAUTH_CALLBACK_PORT || '3457', 10)
-      const oauthCallbackBaseUrl = process.env.CYRUS_OAUTH_CALLBACK_BASE_URL || `http://localhost:${oauthPort}`
       if (!this.oauthServer) {
         this.startOAuthServer(oauthPort)
         console.log(`\n🔐 OAuth server running on port ${oauthPort}`)
         console.log(`👉 To authorize Linear (new workspace or re-auth):`)
-        console.log(`   ${proxyUrl}/oauth/authorize?callback=${oauthCallbackBaseUrl}/callback`)
+        console.log(`   ${proxyUrl}/oauth/authorize?callback=${EdgeApp.CALLBACK_URL}/callback`)
         console.log('─'.repeat(70))
         
         // Set up handler for OAuth completions to automatically trigger repository setup
