@@ -1,4 +1,4 @@
-import type { SDKMessage } from '@anthropic-ai/claude-code'
+import type { SDKMessage, McpServerConfig } from '@anthropic-ai/claude-code'
 
 export interface ClaudeRunnerConfig {
   workingDirectory?: string
@@ -7,7 +7,9 @@ export interface ClaudeRunnerConfig {
   continueSession?: boolean
   workspaceName?: string
   systemPrompt?: string
-  mcpConfigPath?: string
+  appendSystemPrompt?: string  // Additional prompt to append to the default system prompt
+  mcpConfigPath?: string | string[]  // Single path or array of paths to compose
+  mcpConfig?: Record<string, McpServerConfig>  // Additional/override MCP servers
   onMessage?: (message: SDKMessage) => void
   onError?: (error: Error) => void
   onComplete?: (messages: SDKMessage[]) => void
@@ -30,4 +32,4 @@ export interface ClaudeRunnerEvents {
 }
 
 // Re-export SDK types for convenience
-export type { SDKMessage } from '@anthropic-ai/claude-code'
+export type { SDKMessage, McpServerConfig } from '@anthropic-ai/claude-code'

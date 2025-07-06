@@ -39,8 +39,16 @@ class MockClaudeRunner {
     startedAt: new Date(), 
     isRunning: false 
   })
+  startStreaming = vi.fn().mockResolvedValue({ 
+    sessionId: 'test-session', 
+    startedAt: new Date(), 
+    isRunning: false 
+  })
   stop = vi.fn()
   isRunning = vi.fn().mockReturnValue(false)
+  isStreaming = vi.fn().mockReturnValue(false)
+  addStreamMessage = vi.fn()
+  completeStream = vi.fn()
   getSessionInfo = vi.fn().mockReturnValue(null)
   getMessages = vi.fn().mockReturnValue([])
 }
@@ -186,13 +194,7 @@ describe('EdgeWorker - Multi-Repository Support', () => {
     expect(ndjsonClients.size).toBe(2)
 
     // Find the client for token-B (mobile repo)
-    let mobilClient: MockNdjsonClient | undefined
-    for (const [token, client] of ndjsonClients) {
-      if (token === 'token-B') {
-        mobilClient = client as unknown as MockNdjsonClient
-        break
-      }
-    }
+    const mobilClient = (edgeWorker as any)._getClientByToken('token-B') as MockNdjsonClient
     expect(mobilClient).toBeDefined()
 
     // Simulate webhook for workspace-2 (mobile repo)
@@ -275,14 +277,7 @@ describe('EdgeWorker - Multi-Repository Support', () => {
     edgeWorker.on('session:started', sessionStartedHandler)
 
     // Get backend repository's client (token-A)
-    const ndjsonClients = (edgeWorker as any).ndjsonClients
-    let backendClient: MockNdjsonClient | undefined
-    for (const [token, client] of ndjsonClients) {
-      if (token === 'token-A') {
-        backendClient = client as unknown as MockNdjsonClient
-        break
-      }
-    }
+    const backendClient = (edgeWorker as any)._getClientByToken('token-A') as MockNdjsonClient
 
     // Simulate issue assignment for backend repo
     const webhookData = {
@@ -484,16 +479,8 @@ describe('EdgeWorker - Multi-Repository Support', () => {
       const onSessionStartMock = vi.fn()
       edgeWorker.on('session:started', onSessionStartMock)
 
-      // Get the shared client (token-shared) - EdgeWorker should have created it
-      const ndjsonClients = (edgeWorker as any).ndjsonClients
-      let sharedClient: MockNdjsonClient | undefined
-      for (const [token, client] of ndjsonClients) {
-        if (token === 'token-shared') {
-          sharedClient = client as unknown as MockNdjsonClient
-          break
-        }
-      }
-
+      // Get the shared client (token-shared)
+      const sharedClient = (edgeWorker as any)._getClientByToken('token-shared') as MockNdjsonClient
       if (!sharedClient) {
         throw new Error('Expected to find NDJSON client for token-shared')
       }
@@ -621,8 +608,7 @@ describe('EdgeWorker - Multi-Repository Support', () => {
       edgeWorker.on('session:started', onSessionStartMock)
 
       // Get the shared client (token-shared)
-      const ndjsonClients = (edgeWorker as any).ndjsonClients
-      const sharedClient = ndjsonClients.get('token-shared') as MockNdjsonClient
+      const sharedClient = (edgeWorker as any)._getClientByToken('token-shared') as MockNdjsonClient
 
       // Webhook without team key but with matching identifier
       const webhookNoTeam = {
@@ -700,8 +686,7 @@ describe('EdgeWorker - Multi-Repository Support', () => {
       edgeWorker.on('session:started', onSessionStartMock)
 
       // Get the shared client (token-shared)
-      const ndjsonClients = (edgeWorker as any).ndjsonClients
-      const sharedClient = ndjsonClients.get('token-shared') as MockNdjsonClient
+      const sharedClient = (edgeWorker as any)._getClientByToken('token-shared') as MockNdjsonClient
 
       // Webhook with team key that doesn't match any repository
       const unmatchedWebhook = {

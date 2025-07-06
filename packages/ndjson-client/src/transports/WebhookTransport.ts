@@ -119,7 +119,27 @@ export class WebhookTransport extends BaseTransport {
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to register webhook: ${response.status} ${response.statusText}`)
+        let errorMessage = `Failed to register webhook: ${response.status} ${response.statusText}`
+        
+        // Try to get more detailed error message from response
+        try {
+          const errorData = await response.json() as { error?: string }
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+        } catch {
+          // Ignore JSON parsing errors
+        }
+        
+        // Create a more specific error for authentication failures
+        if (response.status === 400 && (errorMessage.includes('Authentication required') || errorMessage.includes('Invalid token or no workspace access'))) {
+          const authError = new Error(`Linear authentication failed for ${this.config.name}. The Linear OAuth token may have expired or been revoked. Please re-authenticate with Linear to obtain a new token.`)
+          ;(authError as any).code = 'LINEAR_AUTH_FAILED'
+          ;(authError as any).isAuthError = true
+          throw authError
+        }
+        
+        throw new Error(errorMessage)
       }
 
       const result = await response.json() as { webhookSecret: string }

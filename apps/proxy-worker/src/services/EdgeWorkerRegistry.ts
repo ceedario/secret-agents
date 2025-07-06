@@ -32,7 +32,7 @@ export class EdgeWorkerRegistry {
     const workspaceIds = await this.validateLinearToken(registration.linearToken)
     
     if (!workspaceIds || workspaceIds.length === 0) {
-      throw new Error('Invalid token or no workspace access')
+      throw new Error('Authentication required, not authenticated')
     }
 
     // Generate webhook secret for this edge worker
@@ -53,7 +53,7 @@ export class EdgeWorkerRegistry {
     await this.env.EDGE_TOKENS.put(
       `edge:worker:${edgeWorkerId}`,
       JSON.stringify(edgeWorker),
-      { expirationTtl: 3600 } // 1 hour TTL, refreshed on activity
+      { expirationTtl: 7776000 } // 90 days TTL, refreshed on activity
     )
 
     // Update workspace-to-edge mapping
@@ -100,7 +100,7 @@ export class EdgeWorkerRegistry {
       await this.env.EDGE_TOKENS.put(
         `edge:worker:${edgeWorkerId}`,
         JSON.stringify(edgeWorker),
-        { expirationTtl: 3600 }
+        { expirationTtl: 7776000 }
       )
     }
   }
@@ -210,7 +210,7 @@ export class EdgeWorkerRegistry {
     
     if (!edges.includes(edgeWorkerId)) {
       edges.push(edgeWorkerId)
-      await this.env.EDGE_TOKENS.put(key, JSON.stringify(edges), { expirationTtl: 3600 })
+      await this.env.EDGE_TOKENS.put(key, JSON.stringify(edges), { expirationTtl: 7776000 })
     }
   }
 
@@ -226,7 +226,7 @@ export class EdgeWorkerRegistry {
       const filteredEdges = edges.filter(id => id !== edgeWorkerId)
       
       if (filteredEdges.length > 0) {
-        await this.env.EDGE_TOKENS.put(key, JSON.stringify(filteredEdges), { expirationTtl: 3600 })
+        await this.env.EDGE_TOKENS.put(key, JSON.stringify(filteredEdges), { expirationTtl: 7776000 })
       } else {
         await this.env.EDGE_TOKENS.delete(key)
       }

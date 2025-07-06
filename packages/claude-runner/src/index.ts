@@ -1,4 +1,4 @@
-export { ClaudeRunner } from './ClaudeRunner.js'
+export { ClaudeRunner, StreamingPrompt } from './ClaudeRunner.js'
 export { 
   availableTools, 
   readOnlyTools, 
@@ -12,5 +12,6 @@ export type {
   ClaudeRunnerConfig,
   ClaudeSessionInfo,
   ClaudeRunnerEvents,
-  SDKMessage
+  SDKMessage,
+  McpServerConfig
 } from './types.js'

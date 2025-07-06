@@ -2,8 +2,93 @@ import { EventEmitter } from 'events'
 import { mkdirSync, createWriteStream, type WriteStream, readFileSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
-import { query, type SDKMessage, AbortError } from '@anthropic-ai/claude-code'
+import { query, type SDKMessage, type SDKUserMessage, AbortError } from '@anthropic-ai/claude-code'
 import type { ClaudeRunnerConfig, ClaudeRunnerEvents, ClaudeSessionInfo } from './types.js'
+
+/**
+ * Streaming prompt controller that implements AsyncIterable<SDKUserMessage>
+ */
+export class StreamingPrompt {
+  private messageQueue: SDKUserMessage[] = []
+  private resolvers: Array<(value: IteratorResult<SDKUserMessage>) => void> = []
+  private isComplete = false
+  private sessionId: string
+
+  constructor(sessionId: string, initialPrompt?: string) {
+    this.sessionId = sessionId
+    
+    // Add initial prompt if provided
+    if (initialPrompt) {
+      this.addMessage(initialPrompt)
+    }
+  }
+
+  /**
+   * Add a new message to the stream
+   */
+  addMessage(content: string): void {
+    if (this.isComplete) {
+      throw new Error('Cannot add message to completed stream')
+    }
+
+    const message: SDKUserMessage = {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: content
+      },
+      parent_tool_use_id: null,
+      session_id: this.sessionId
+    }
+
+    this.messageQueue.push(message)
+    this.processQueue()
+  }
+
+  /**
+   * Mark the stream as complete (no more messages will be added)
+   */
+  complete(): void {
+    this.isComplete = true
+    this.processQueue()
+  }
+
+  /**
+   * Process pending resolvers with queued messages
+   */
+  private processQueue(): void {
+    while (this.resolvers.length > 0 && (this.messageQueue.length > 0 || this.isComplete)) {
+      const resolver = this.resolvers.shift()!
+      
+      if (this.messageQueue.length > 0) {
+        const message = this.messageQueue.shift()!
+        resolver({ value: message, done: false })
+      } else if (this.isComplete) {
+        resolver({ value: undefined, done: true })
+      }
+    }
+  }
+
+  /**
+   * AsyncIterable implementation
+   */
+  [Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> {
+    return {
+      next: (): Promise<IteratorResult<SDKUserMessage>> => {
+        return new Promise((resolve) => {
+          if (this.messageQueue.length > 0) {
+            const message = this.messageQueue.shift()!
+            resolve({ value: message, done: false })
+          } else if (this.isComplete) {
+            resolve({ value: undefined, done: true })
+          } else {
+            this.resolvers.push(resolve)
+          }
+        })
+      }
+    }
+  }
+}
 
 export declare interface ClaudeRunner {
   on<K extends keyof ClaudeRunnerEvents>(event: K, listener: ClaudeRunnerEvents[K]): this
@@ -19,6 +104,7 @@ export class ClaudeRunner extends EventEmitter {
   private sessionInfo: ClaudeSessionInfo | null = null
   private logStream: WriteStream | null = null
   private messages: SDKMessage[] = []
+  private streamingPrompt: StreamingPrompt | null = null
 
   constructor(config: ClaudeRunnerConfig) {
     super()
@@ -31,9 +117,42 @@ export class ClaudeRunner extends EventEmitter {
   }
 
   /**
-   * Start a new Claude session
+   * Start a new Claude session with string prompt (legacy mode)
    */
   async start(prompt: string): Promise<ClaudeSessionInfo> {
+    return this.startWithPrompt(prompt)
+  }
+
+  /**
+   * Start a new Claude session with streaming input
+   */
+  async startStreaming(initialPrompt?: string): Promise<ClaudeSessionInfo> {
+    return this.startWithPrompt(null, initialPrompt)
+  }
+
+  /**
+   * Add a message to the streaming prompt (only works when in streaming mode)
+   */
+  addStreamMessage(content: string): void {
+    if (!this.streamingPrompt) {
+      throw new Error('Cannot add stream message when not in streaming mode')
+    }
+    this.streamingPrompt.addMessage(content)
+  }
+
+  /**
+   * Complete the streaming prompt (no more messages will be added)
+   */
+  completeStream(): void {
+    if (this.streamingPrompt) {
+      this.streamingPrompt.complete()
+    }
+  }
+
+  /**
+   * Internal method to start a Claude session with either string or streaming prompt
+   */
+  private async startWithPrompt(stringPrompt?: string | null, streamingInitialPrompt?: string): Promise<ClaudeSessionInfo> {
     if (this.isRunning()) {
       throw new Error('Claude session already running')
     }
@@ -69,8 +188,19 @@ export class ClaudeRunner extends EventEmitter {
     this.messages = []
 
     try {
-      // Start the query
-      console.log(`[ClaudeRunner] Starting query with prompt length: ${prompt.length} characters`)
+      // Determine prompt mode and setup
+      let promptForQuery: string | AsyncIterable<SDKUserMessage>
+      
+      if (stringPrompt !== null && stringPrompt !== undefined) {
+        // String mode
+        console.log(`[ClaudeRunner] Starting query with string prompt length: ${stringPrompt.length} characters`)
+        promptForQuery = stringPrompt
+      } else {
+        // Streaming mode
+        console.log(`[ClaudeRunner] Starting query with streaming prompt`)
+        this.streamingPrompt = new StreamingPrompt(sessionId, streamingInitialPrompt)
+        promptForQuery = this.streamingPrompt
+      }
       
       // Process allowed directories by adding Read patterns to allowedTools
       let processedAllowedTools = this.config.allowedTools ? [...this.config.allowedTools] : undefined
@@ -84,25 +214,41 @@ export class ClaudeRunner extends EventEmitter {
         processedAllowedTools = processedAllowedTools ? [...processedAllowedTools, ...directoryTools] : directoryTools
       }
 
-      // Parse MCP config if provided
+      // Parse MCP config - merge file(s) and inline configs
       let mcpServers = {}
+      
+      // First, load from file(s) if provided
       if (this.config.mcpConfigPath) {
-        try {
-          const mcpConfigContent = readFileSync(this.config.mcpConfigPath, 'utf8')
-          const mcpConfig = JSON.parse(mcpConfigContent)
-          mcpServers = mcpConfig.mcpServers || {}
-          console.log(`[ClaudeRunner] Loaded MCP servers: ${Object.keys(mcpServers).join(', ')}`)
-        } catch (error) {
-          console.error(`[ClaudeRunner] Failed to load MCP config from ${this.config.mcpConfigPath}:`, error)
+        const paths = Array.isArray(this.config.mcpConfigPath) 
+          ? this.config.mcpConfigPath 
+          : [this.config.mcpConfigPath]
+        
+        for (const path of paths) {
+          try {
+            const mcpConfigContent = readFileSync(path, 'utf8')
+            const mcpConfig = JSON.parse(mcpConfigContent)
+            const servers = mcpConfig.mcpServers || {}
+            mcpServers = { ...mcpServers, ...servers }
+            console.log(`[ClaudeRunner] Loaded MCP servers from ${path}: ${Object.keys(servers).join(', ')}`)
+          } catch (error) {
+            console.error(`[ClaudeRunner] Failed to load MCP config from ${path}:`, error)
+          }
         }
+      }
+      
+      // Then, merge inline config (overrides file config for same server names)
+      if (this.config.mcpConfig) {
+        mcpServers = { ...mcpServers, ...this.config.mcpConfig }
+        console.log(`[ClaudeRunner] Final MCP servers after merge: ${Object.keys(mcpServers).join(', ')}`)
       }
 
       const queryOptions: Parameters<typeof query>[0] = {
-        prompt,
-        abortController: this.abortController,
+        prompt: promptForQuery,
         options: {
+          abortController: this.abortController,
           ...(this.config.workingDirectory && { cwd: this.config.workingDirectory }),
-          ...(this.config.systemPrompt && { systemPrompt: this.config.systemPrompt }),
+          ...(this.config.systemPrompt && { customSystemPrompt: this.config.systemPrompt }),
+          ...(this.config.appendSystemPrompt && { appendSystemPrompt: this.config.appendSystemPrompt }),
           ...(processedAllowedTools && { allowedTools: processedAllowedTools }),
           ...(this.config.continueSession && { continue: this.config.continueSession }),
           ...(Object.keys(mcpServers).length > 0 && { mcpServers })
@@ -117,7 +263,6 @@ export class ClaudeRunner extends EventEmitter {
         }
 
         this.messages.push(message)
-        console.log(`[ClaudeRunner] Received message: ${message.type}`)
         
         // Log the message
         if (this.logStream) {
@@ -132,6 +277,12 @@ export class ClaudeRunner extends EventEmitter {
         // Emit appropriate events based on message type
         this.emit('message', message)
         this.processMessage(message)
+        
+        // If we get a result message while streaming, complete the stream
+        if (message.type === 'result' && this.streamingPrompt) {
+          console.log('[ClaudeRunner] Got result message, completing streaming prompt')
+          this.streamingPrompt.complete()
+        }
       }
 
       // Session completed successfully
@@ -159,6 +310,12 @@ export class ClaudeRunner extends EventEmitter {
       // Clean up
       this.abortController = null
       
+      // Complete and clean up streaming prompt if it exists
+      if (this.streamingPrompt) {
+        this.streamingPrompt.complete()
+        this.streamingPrompt = null
+      }
+      
       // Close log stream
       if (this.logStream) {
         this.logStream.end()
@@ -179,6 +336,12 @@ export class ClaudeRunner extends EventEmitter {
       this.abortController = null
     }
     
+    // Complete streaming prompt if in streaming mode
+    if (this.streamingPrompt) {
+      this.streamingPrompt.complete()
+      this.streamingPrompt = null
+    }
+    
     if (this.sessionInfo) {
       this.sessionInfo.isRunning = false
     }
@@ -189,6 +352,13 @@ export class ClaudeRunner extends EventEmitter {
    */
   isRunning(): boolean {
     return this.sessionInfo?.isRunning ?? false
+  }
+
+  /**
+   * Check if session is in streaming mode and still running
+   */
+  isStreaming(): boolean {
+    return this.streamingPrompt !== null && this.isRunning()
   }
 
   /**

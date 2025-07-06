@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { LinearClient, Issue as LinearIssue, Comment } from '@linear/sdk'
 import { NdjsonClient } from 'cyrus-ndjson-client'
 import { ClaudeRunner, getSafeTools } from 'cyrus-claude-runner'
+import type { McpServerConfig } from 'cyrus-claude-runner'
 import { SessionManager, Session } from 'cyrus-core'
 import type { Issue as CoreIssue } from 'cyrus-core'
 import type {
@@ -46,6 +47,7 @@ export class EdgeWorker extends EventEmitter {
   private claudeRunners: Map<string, ClaudeRunner> = new Map()
   private sessionToRepo: Map<string, string> = new Map() // Maps session ID to repository ID
   private issueToCommentId: Map<string, string> = new Map() // Maps issue ID to initial comment ID
+  private tokenToClientId: Map<string, string> = new Map() // Maps token to NDJSON client ID
   private issueToReplyContext: Map<string, { commentId: string; parentId?: string }> = new Map() // Maps issue ID to reply context
   private sharedApplicationServer: SharedApplicationServer
 
@@ -86,9 +88,14 @@ export class EdgeWorker extends EventEmitter {
 
     // Create one NDJSON client per unique token using shared application server
     for (const [token, repos] of tokenToRepos) {
+      if (!repos || repos.length === 0) continue
+      const firstRepo = repos[0]
+      if (!firstRepo) continue
+      const primaryRepoId = firstRepo.id
       const ndjsonClient = new NdjsonClient({
         proxyUrl: config.proxyUrl,
         token: token,
+        name: repos.map(r => r.name).join(', '), // Pass repository names
         transport: 'webhook',
         // Use shared application server instead of individual servers
         useExternalWebhookServer: true,
@@ -99,8 +106,8 @@ export class EdgeWorker extends EventEmitter {
         ...(config.baseUrl && { webhookBaseUrl: config.baseUrl }),
         // Legacy fallback support
         ...(!config.baseUrl && config.webhookBaseUrl && { webhookBaseUrl: config.webhookBaseUrl }),
-        onConnect: () => this.handleConnect(token),
-        onDisconnect: (reason) => this.handleDisconnect(token, reason),
+        onConnect: () => this.handleConnect(primaryRepoId, repos),
+        onDisconnect: (reason) => this.handleDisconnect(primaryRepoId, repos, reason),
         onError: (error) => this.handleError(error)
       })
 
@@ -114,7 +121,12 @@ export class EdgeWorker extends EventEmitter {
         })
       }
 
-      this.ndjsonClients.set(token, ndjsonClient)
+      // Store with the first repo's ID as the key (for error messages)
+      // But also store the token mapping for lookup
+      this.ndjsonClients.set(primaryRepoId, ndjsonClient)
+      
+      // Store token to client mapping for other lookups if needed
+      this.tokenToClientId.set(token, primaryRepoId)
     }
   }
 
@@ -126,10 +138,52 @@ export class EdgeWorker extends EventEmitter {
     await this.sharedApplicationServer.start()
     
     // Connect all NDJSON clients
-    const connections = Array.from(this.ndjsonClients.values()).map(client => 
-      client.connect()
-    )
-    await Promise.all(connections)
+    const connections = Array.from(this.ndjsonClients.entries()).map(async ([repoId, client]) => {
+      try {
+        await client.connect()
+      } catch (error: any) {
+        const repoConfig = this.config.repositories.find(r => r.id === repoId)
+        const repoName = repoConfig?.name || repoId
+        
+        // Check if it's an authentication error
+        if (error.isAuthError || error.code === 'LINEAR_AUTH_FAILED') {
+          console.error(`\n❌ Linear authentication failed for repository: ${repoName}`)
+          console.error(`   Workspace: ${repoConfig?.linearWorkspaceName || repoConfig?.linearWorkspaceId || 'Unknown'}`)
+          console.error(`   Error: ${error.message}`)
+          console.error(`\n   To fix this issue:`)
+          console.error(`   1. Run: cyrus refresh-token`)
+          console.error(`   2. Complete the OAuth flow in your browser`)
+          console.error(`   3. The configuration will be automatically updated\n`)
+          console.error(`   You can also check all tokens with: cyrus check-tokens\n`)
+          
+          // Continue with other repositories instead of failing completely
+          return { repoId, success: false, error }
+        }
+        
+        // For other errors, still log but with less guidance
+        console.error(`\n❌ Failed to connect repository: ${repoName}`)
+        console.error(`   Error: ${error.message}\n`)
+        return { repoId, success: false, error }
+      }
+      return { repoId, success: true }
+    })
+    
+    const results = await Promise.all(connections)
+    const failures = results.filter(r => !r.success)
+    
+    if (failures.length === this.ndjsonClients.size) {
+      // All connections failed
+      throw new Error('Failed to connect any repositories. Please check your configuration and Linear tokens.')
+    } else if (failures.length > 0) {
+      // Some connections failed
+      console.warn(`\n⚠️  Connected ${results.length - failures.length} out of ${results.length} repositories`)
+      console.warn(`   The following repositories could not be connected:`)
+      failures.forEach(f => {
+        const repoConfig = this.config.repositories.find(r => r.id === f.repoId)
+        console.warn(`   - ${repoConfig?.name || f.repoId}`)
+      })
+      console.warn(`\n   Cyrus will continue running with the available repositories.\n`)
+    }
   }
 
   /**
@@ -160,7 +214,9 @@ export class EdgeWorker extends EventEmitter {
   /**
    * Handle connection established
    */
-  private handleConnect(token: string): void {
+  private handleConnect(clientId: string, repos: RepositoryConfig[]): void {
+    // Get the token for backward compatibility with events
+    const token = repos[0]?.linearToken || clientId
     this.emit('connected', token)
     // Connection logged by CLI app event handler
   }
@@ -168,7 +224,9 @@ export class EdgeWorker extends EventEmitter {
   /**
    * Handle disconnection
    */
-  private handleDisconnect(token: string, reason?: string): void {
+  private handleDisconnect(clientId: string, repos: RepositoryConfig[], reason?: string): void {
+    // Get the token for backward compatibility with events
+    const token = repos[0]?.linearToken || clientId
     this.emit('disconnected', token, reason)
   }
 
@@ -353,13 +411,17 @@ export class EdgeWorker extends EventEmitter {
       allowedDirectories.push(attachmentResult.attachmentsDir)
     }
 
+    // Build allowed tools list with Linear MCP tools
+    const allowedTools = this.buildAllowedTools(repository)
+
     // Create Claude runner with attachment directory access
     const runner = new ClaudeRunner({
       workingDirectory: workspace.path,
-      allowedTools: repository.allowedTools || this.config.defaultAllowedTools || getSafeTools(),
+      allowedTools,
       allowedDirectories,
       workspaceName: fullIssue.identifier,
       mcpConfigPath: repository.mcpConfigPath,
+      mcpConfig: this.buildMcpConfig(repository),
       onMessage: (message) => this.handleClaudeMessage(fullIssue.id, message, repository.id),
       onComplete: (messages) => this.handleClaudeComplete(fullIssue.id, messages, repository.id),
       onError: (error) => this.handleClaudeError(fullIssue.id, error, repository.id)
@@ -387,14 +449,14 @@ export class EdgeWorker extends EventEmitter {
     this.emit('session:started', fullIssue.id, fullIssue, repository.id)
     this.config.handlers?.onSessionStart?.(fullIssue.id, fullIssue, repository.id)
 
-    // Build and start Claude with initial prompt using full issue
+    // Build and start Claude with initial prompt using full issue (streaming mode)
     console.log(`[EdgeWorker] Building initial prompt for issue ${fullIssue.identifier}`)
     try {
       const prompt = await this.buildInitialPrompt(fullIssue, repository, attachmentResult.manifest)
       console.log(`[EdgeWorker] Initial prompt built successfully, length: ${prompt.length} characters`)
-      console.log(`[EdgeWorker] Starting Claude session`)
-      const sessionInfo = await runner.start(prompt)
-      console.log(`[EdgeWorker] Claude session started: ${sessionInfo.sessionId}`)
+      console.log(`[EdgeWorker] Starting Claude streaming session`)
+      const sessionInfo = await runner.startStreaming(prompt)
+      console.log(`[EdgeWorker] Claude streaming session started: ${sessionInfo.sessionId}`)
     } catch (error) {
       console.error(`[EdgeWorker] Error in prompt building/starting:`, error)
       throw error
@@ -450,24 +512,6 @@ export class EdgeWorker extends EventEmitter {
     })
     console.log(`Stored reply context for issue ${issue.id}: commentId=${comment.id}, replyParentId=${replyParentId}`)
     
-    // Post immediate reply that will be updated with TODOs
-    try {
-      const immediateReply = await this.postComment(
-        issue.id,
-        "I'm getting started on that right away. I'll update this comment with my plan as I work through it.",
-        repository.id,
-        replyParentId
-      )
-      
-      if (immediateReply?.id) {
-        // Store this as the comment to update with TODOs
-        this.issueToCommentId.set(issue.id, immediateReply.id)
-        console.log(`Posted immediate reply with ID: ${immediateReply.id}`)
-      }
-    } catch (error) {
-      console.error('Failed to post immediate reply:', error)
-    }
-
     let session = this.sessionManager.getSession(issue.id)
     
     // If no session exists, we need to create one
@@ -506,20 +550,59 @@ export class EdgeWorker extends EventEmitter {
       this.sessionToRepo.set(issue.id, repository.id)
     }
 
-    // Kill existing Claude process if running
+    // Check if there's an existing runner and if it supports streaming
     const existingRunner = this.claudeRunners.get(issue.id)
+    if (existingRunner && existingRunner.isStreaming()) {
+      // Post immediate reply for streaming case
+      await this.postComment(
+        issue.id,
+        "I've queued up your message to address it right after I resolve my current focus.",
+        repository.id,
+        replyParentId
+      )
+      
+      // Add comment to existing stream instead of restarting
+      console.log(`[EdgeWorker] Adding comment to existing stream for issue ${issue.identifier}`)
+      try {
+        existingRunner.addStreamMessage(comment.body || '')
+        return // Exit early - comment has been added to stream
+      } catch (error) {
+        console.error(`[EdgeWorker] Failed to add comment to stream, will stop the existing session and start a new one: ${error}`)
+        // Fall through to restart logic below
+      }
+    }
+
+    // Post immediate reply for new session case
+    const immediateReply = await this.postComment(
+      issue.id,
+      "I'm getting started on that right away. I'll update this comment with my plan as I work through it.",
+      repository.id,
+      replyParentId
+    )
+    
+    if (immediateReply?.id) {
+      // Store this as the comment to update with TODOs
+      this.issueToCommentId.set(issue.id, immediateReply.id)
+      console.log(`Posted immediate reply with ID: ${immediateReply.id}`)
+    }
+
+    // Stop existing runner if it's not streaming or stream addition failed
     if (existingRunner) {
       existingRunner.stop()
     }
 
     try {
-      // Create new runner with --continue flag
+      // Build allowed tools list with Linear MCP tools
+      const allowedTools = this.buildAllowedTools(repository)
+
+      // Create new runner with streaming mode
       const runner = new ClaudeRunner({
         workingDirectory: session.workspace.path,
-        allowedTools: repository.allowedTools || this.config.defaultAllowedTools || getSafeTools(),
+        allowedTools,
         continueSession: true,
         workspaceName: issue.identifier,
         mcpConfigPath: repository.mcpConfigPath,
+        mcpConfig: this.buildMcpConfig(repository),
         onMessage: (message) => {
           // Check for continuation errors
           if (message.type === 'assistant' && 'message' in message && message.message?.content) {
@@ -546,8 +629,9 @@ export class EdgeWorker extends EventEmitter {
       // Store new runner
       this.claudeRunners.set(issue.id, runner)
 
-      // Start continuation session with the comment as prompt
-      await runner.start(comment.body || '')
+      // Start streaming session with the comment as initial prompt
+      console.log(`[EdgeWorker] Starting new streaming session for issue ${issue.identifier}`)
+      await runner.startStreaming(comment.body || '')
     } catch (error) {
       console.error('Failed to continue conversation, starting fresh:', error)
       // Remove any partially created session
@@ -911,12 +995,12 @@ Please analyze this issue and help implement a solution.`
   }
 
   /**
-   * Get connection status
+   * Get connection status by repository ID
    */
   getConnectionStatus(): Map<string, boolean> {
     const status = new Map<string, boolean>()
-    for (const [token, client] of this.ndjsonClients) {
-      status.set(token, client.isConnected())
+    for (const [repoId, client] of this.ndjsonClients) {
+      status.set(repoId, client.isConnected())
     }
     return status
   }
@@ -926,6 +1010,20 @@ Please analyze this issue and help implement a solution.`
    */
   getActiveSessions(): string[] {
     return Array.from(this.sessionManager.getAllSessions().keys())
+  }
+
+  /**
+   * Get NDJSON client by token (for testing purposes)
+   * @internal
+   */
+  _getClientByToken(token: string): any {
+    for (const [repoId, client] of this.ndjsonClients) {
+      const repo = this.repositories.get(repoId)
+      if (repo?.linearToken === token) {
+        return client
+      }
+    }
+    return undefined
   }
 
   /**
@@ -1446,5 +1544,76 @@ Please analyze this issue and help implement a solution.`
       // If we can't determine, err on the side of caution and allow the trigger
       return true
     }
+  }
+
+  /**
+   * Build MCP configuration with automatic Linear server injection
+   */
+  private buildMcpConfig(repository: RepositoryConfig): Record<string, McpServerConfig> {
+    // Always inject the Linear MCP server with the repository's token
+    const mcpConfig: Record<string, McpServerConfig> = {
+      linear: {
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', '@tacticlaunch/mcp-linear'],
+        env: {
+          LINEAR_API_TOKEN: repository.linearToken
+        }
+      }
+    }
+
+    return mcpConfig
+  }
+
+  /**
+   * Build allowed tools list with Linear MCP tools automatically included
+   */
+  private buildAllowedTools(repository: RepositoryConfig): string[] {
+    // Start with configured tools or defaults
+    const baseTools = repository.allowedTools || this.config.defaultAllowedTools || getSafeTools()
+    
+    // Ensure baseTools is an array
+    const baseToolsArray = Array.isArray(baseTools) ? baseTools : []
+    
+    // Linear MCP tools that should always be available
+    const linearMcpTools = [
+      "mcp__linear__linear_getViewer",
+      "mcp__linear__linear_getOrganization",
+      "mcp__linear__linear_getUsers",
+      "mcp__linear__linear_getLabels",
+      "mcp__linear__linear_getTeams",
+      "mcp__linear__linear_getWorkflowStates",
+      "mcp__linear__linear_getProjects",
+      "mcp__linear__linear_createProject",
+      "mcp__linear__linear_updateProject",
+      "mcp__linear__linear_addIssueToProject",
+      "mcp__linear__linear_getProjectIssues",
+      "mcp__linear__linear_getCycles",
+      "mcp__linear__linear_getActiveCycle",
+      "mcp__linear__linear_addIssueToCycle",
+      "mcp__linear__linear_getIssues",
+      "mcp__linear__linear_getIssueById",
+      "mcp__linear__linear_searchIssues",
+      "mcp__linear__linear_createIssue",
+      "mcp__linear__linear_updateIssue",
+      "mcp__linear__linear_createComment",
+      "mcp__linear__linear_addIssueLabel",
+      "mcp__linear__linear_removeIssueLabel",
+      "mcp__linear__linear_assignIssue",
+      "mcp__linear__linear_subscribeToIssue",
+      "mcp__linear__linear_convertIssueToSubtask",
+      "mcp__linear__linear_createIssueRelation",
+      "mcp__linear__linear_archiveIssue",
+      "mcp__linear__linear_setIssuePriority",
+      "mcp__linear__linear_transferIssue",
+      "mcp__linear__linear_duplicateIssue",
+      "mcp__linear__linear_getIssueHistory",
+      "mcp__linear__linear_getComments"
+    ]
+    
+    // Combine and deduplicate
+    const allTools = [...new Set([...baseToolsArray, ...linearMcpTools])]
+    
+    return allTools
   }
 }

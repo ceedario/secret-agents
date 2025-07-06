@@ -45,8 +45,8 @@ pnpm build
 # Run tests across all packages
 pnpm test
 
-# Run tests only in packages directory
-pnpm test:packages
+# Run tests only in packages directory (recommended)
+pnpm test:packages:run
 
 # Run TypeScript type checking
 pnpm typecheck
@@ -155,9 +155,11 @@ When working on this codebase, follow these practices:
 
 2. **Changelog Format**:
    - Follow [Keep a Changelog](https://keepachangelog.com/) format
-   - Be concise but descriptive
-   - Focus on what users/developers need to know
+   - **Focus only on end-user impact**: Write entries from the perspective of users running the `cyrus` CLI binary
+   - Avoid technical implementation details, package names, or internal architecture changes
+   - Be concise but descriptive about what users will experience differently
    - Group related changes together
+   - Example: "New comments now feed into existing sessions" NOT "Implemented AsyncIterable<SDKUserMessage> for ClaudeRunner"
 
 ## Key Code Paths
 
@@ -167,23 +169,84 @@ When working on this codebase, follow these practices:
 - **Edge Worker**: `packages/edge-worker/src/EdgeWorker.ts`
 - **OAuth Flow**: `apps/proxy/src/services/OAuthService.mjs`
 
+## Testing MCP Linear Integration
+
+To test the Linear MCP (Model Context Protocol) integration in the claude-runner package:
+
+1. **Setup Environment Variables**:
+   ```bash
+   cd packages/claude-runner
+   # Create .env file with your Linear API token
+   echo "LINEAR_API_TOKEN=your_linear_token_here" > .env
+   ```
+
+2. **Build the Package**:
+   ```bash
+   pnpm build
+   ```
+
+3. **Run the Test Script**:
+   ```bash
+   node test-scripts/simple-claude-runner-test.js
+   ```
+
+The test script demonstrates:
+- Loading Linear API token from environment variables
+- Configuring the `@tacticlaunch/mcp-linear` MCP server
+- Listing available MCP tools
+- Using Linear MCP tools to fetch user info and issues
+- Proper error handling and logging
+
+The script will show:
+- Whether the MCP server connects successfully
+- What Linear tools are available
+- Current user information
+- Issues in your Linear workspace
+
+This integration is automatically available in all Cyrus sessions - the EdgeWorker automatically configures the Linear MCP server for each repository using its Linear token.
+
 ## Publishing
 
 **Important: Always publish packages in the correct order to ensure proper dependency resolution.**
 
-### Publishing Workflow
+### Pre-Publishing Checklist
 
-1. **Publish underlying packages first** (if they've changed):
+1. **Update CHANGELOG.md**: 
+   - Move items from `## [Unreleased]` to a new versioned section
+   - Use the CLI version number (e.g., `## [0.1.22] - 2025-01-06`)
+   - Focus on end-user impact from the perspective of the `cyrus` CLI
+
+2. **Commit all changes**:
    ```bash
-   cd packages/core && pnpm publish --access public
-   cd ../claude-runner && pnpm publish --access public  
-   cd ../edge-worker && pnpm publish --access public
-   cd ../ndjson-client && pnpm publish --access public
+   git add -A
+   git commit -m "Prepare release v0.1.XX"
+   git push
    ```
 
-2. **Then publish the CLI** to pick up latest package versions:
+### Publishing Workflow
+
+1. **Install dependencies from root**:
    ```bash
-   cd apps/cli && pnpm publish --access public
+   pnpm install  # Ensures all workspace dependencies are up to date
+   ```
+
+2. **Build and publish underlying packages first** (if they've changed):
+   ```bash
+   cd packages/core && pnpm install && pnpm build && pnpm publish --access public
+   cd ../claude-runner && pnpm install && pnpm build && pnpm publish --access public  
+   cd ../edge-worker && pnpm install && pnpm build && pnpm publish --access public
+   cd ../ndjson-client && pnpm install && pnpm build && pnpm publish --access public
+   ```
+
+3. **Install again from root to update lockfile**:
+   ```bash
+   cd ../.. # Back to root
+   pnpm install  # Updates lockfile with published package versions
+   ```
+
+4. **Finally publish the CLI**:
+   ```bash
+   cd apps/cli && pnpm install && pnpm build && pnpm publish --access public
    ```
 
 This ensures that when pnpm resolves `workspace:*` references during CLI publishing, it uses the latest published package versions rather than outdated ones.

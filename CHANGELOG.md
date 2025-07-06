@@ -4,6 +4,119 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.28] - 2025-01-06
+
+### CLI
+- cyrus-ai@0.1.28
+
+### Fixed
+- Fixed critical streaming hang where sessions would never complete
+  - Auto-completes streaming prompt when Claude sends result message
+  - Prevents infinite wait in for-await loop
+
+## [0.1.27] - 2025-01-06
+
+### CLI
+- cyrus-ai@0.1.27
+
+### Changed
+- Updated to use edge-worker 0.0.12 with fixed claude-runner dependency
+
+## [0.1.26] - 2025-01-06
+
+### CLI
+- cyrus-ai@0.1.26
+
+### Fixed
+- Fixed critical streaming hang issue where Claude Code would block waiting for messages
+  - Corrected `abortController` placement in query options (was at wrong nesting level)
+  - Fixed system prompt parameter name (now uses `customSystemPrompt` as expected by Claude Code)
+
+### Added
+- Added `appendSystemPrompt` option to ClaudeRunner config for extending default system prompt
+
+## [0.1.25] - 2025-01-06
+
+### CLI
+- cyrus-ai@0.1.25
+
+### Fixed
+- Fixed streaming session detection to prevent "I've queued up your message..." when sessions have completed
+- Improved isStreaming() method to check both streaming state and session running status
+
+## [0.1.24] - 2025-01-06
+
+### CLI
+- cyrus-ai@0.1.24
+
+### Fixed
+- Fixed version command showing incorrect version number
+
+## [0.1.23] - 2025-01-06
+
+### CLI
+- cyrus-ai@0.1.23
+
+### Fixed
+- Fixed streaming input sessions not properly cleaning up after completion
+  - Resolves issue where "I've queued up your message..." appeared even after sessions had resolved
+  - Properly closes input streams when Claude sessions complete naturally
+
+### Added
+- Added `cyrus check-tokens` command to validate all Linear OAuth tokens across repositories
+- Added `cyrus refresh-token` command with OAuth flow integration to renew expired tokens
+- Improved error handling for expired Linear tokens with graceful degradation
+  - Shows clear error messages with suggested resolution steps
+  - Continues running with valid repositories when some tokens are expired
+
+### Changed
+- Configuration file location moved from `.edge-config.json` in current directory to `~/.cyrus/config.json`
+  - Automatically migrates existing `.edge-config.json` files to the new location
+  - Uses standard user configuration directory for better cross-platform compatibility
+  - Reports migration status when detected
+- Default workspace directory changed from `{repository}/workspaces` to `~/.cyrus/workspaces/{repo-name}`
+  - Centralizes all cyrus-related files in the user's home directory
+  - Uses sanitized repository names as namespace folders
+  - Existing configurations remain unchanged
+
+## [0.1.22] - 2025-01-06
+
+### CLI
+- cyrus-ai@0.1.22
+
+### Added
+- Automatic Linear MCP (Model Context Protocol) server integration
+  - Claude can now use Linear API tools directly within sessions
+  - Automatically configures `@tacticlaunch/mcp-linear` server with repository's Linear token
+  - Adds 30+ Linear MCP tools for issue management, comments, projects, and more
+  - No additional configuration needed - works out of the box with existing Linear tokens
+
+### Changed
+- ClaudeRunner now supports array of MCP config paths for composable configurations
+- ClaudeRunner supports inline MCP server configurations alongside file-based configs
+- MCP configurations from files and inline sources are merged together
+
+### Fixed
+- Fixed webhook signature verification failures after restarting cyrus by extending edge worker registration TTL from 1 hour to 90 days
+  - Resolves "Webhook signature verification failed for all registered handlers" error that occurred when cyrus was stopped and restarted
+  - Edge worker registrations in the proxy now persist for 90 days instead of expiring after 1 hour
+
+### Improved
+- New comments on Linear issues queue up when Cyrus is already busy working, so that you can send multiple in a row ([#77](https://github.com/ceedaragents/cyrus/pull/77)) (now feed into existing Claude sessions instead of killing and restarting the session
+
+### Packages
+
+#### cyrus-claude-runner
+- cyrus-claude-runner@0.0.8
+
+#### cyrus-edge-worker
+- cyrus-edge-worker@0.0.10
+
+## [0.1.21] - 2025-01-05
+
+### CLI
+- cyrus-ai@0.1.21
+
 ### Added
 - Added `CYRUS_HOST_EXTERNAL` environment variable to enable external server access ([#78](https://github.com/ceedaragents/cyrus/pull/78))
   - Set to `true` to listen on `0.0.0.0` (all interfaces) instead of `localhost`
@@ -15,6 +128,11 @@ All notable changes to this project will be documented in this file.
   - **Action Required**: Update environment configuration to use `CYRUS_BASE_URL` instead of `CYRUS_WEBHOOK_BASE_URL`
   - **Legacy Support**: `CYRUS_WEBHOOK_BASE_URL` is still supported for backward compatibility but deprecated
   - The variable serves both webhook and OAuth callback purposes since they run on the same server
+
+### Packages
+
+#### cyrus-edge-worker
+- cyrus-edge-worker@0.0.9
 
 ## [0.1.19] - 2025-01-04
 

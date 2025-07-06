@@ -3,27 +3,47 @@
 import { EdgeWorker, type EdgeWorkerConfig, type RepositoryConfig } from 'cyrus-edge-worker'
 import type { Issue } from '@linear/sdk'
 import dotenv from 'dotenv'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs'
 import { resolve, dirname, basename } from 'path'
-import { fileURLToPath } from 'url'
 import open from 'open'
 import readline from 'readline'
+import http from 'http'
+import { homedir } from 'os'
 
 // Parse command line arguments
 const args = process.argv.slice(2)
 const envFileArg = args.find(arg => arg.startsWith('--env-file='))
 
-// Get __dirname for ES modules
-const __dirname = dirname(fileURLToPath(import.meta.url))
+// Note: __dirname removed since version is now hardcoded
 
 // Handle --version argument
 if (args.includes('--version')) {
-  try {
-    const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
-    console.log(pkg.version)
-  } catch {
-    console.log('0.1.8') // fallback version
-  }
+  console.log('0.1.28')
+  process.exit(0)
+}
+
+// Handle --help argument
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`
+cyrus - AI-powered Linear issue automation using Claude
+
+Usage: cyrus [command] [options]
+
+Commands:
+  start              Start the edge worker (default)
+  check-tokens       Check the status of all Linear tokens
+  refresh-token      Refresh a specific Linear token
+
+Options:
+  --version          Show version number
+  --help, -h         Show help
+  --env-file=<path>  Load environment variables from file
+
+Examples:
+  cyrus                          Start the edge worker
+  cyrus check-tokens             Check all Linear token statuses
+  cyrus refresh-token            Interactive token refresh
+`)
   process.exit(0)
 }
 
@@ -60,11 +80,63 @@ class EdgeApp {
   private isShuttingDown = false
 
   /**
+   * Get the edge configuration file path
+   */
+  getEdgeConfigPath(): string {
+    return resolve(homedir(), '.cyrus', 'config.json')
+  }
+
+  /**
+   * Get the legacy edge configuration file path (for migration)
+   */
+  getLegacyEdgeConfigPath(): string {
+    return resolve(process.cwd(), '.edge-config.json')
+  }
+
+  /**
+   * Migrate configuration from legacy location if needed
+   */
+  private migrateConfigIfNeeded(): void {
+    const newConfigPath = this.getEdgeConfigPath()
+    const legacyConfigPath = this.getLegacyEdgeConfigPath()
+    
+    // If new config already exists, no migration needed
+    if (existsSync(newConfigPath)) {
+      return
+    }
+    
+    // If legacy config doesn't exist, no migration needed
+    if (!existsSync(legacyConfigPath)) {
+      return
+    }
+    
+    try {
+      // Ensure the ~/.cyrus directory exists
+      const configDir = dirname(newConfigPath)
+      if (!existsSync(configDir)) {
+        mkdirSync(configDir, { recursive: true })
+      }
+      
+      // Copy the legacy config to the new location
+      copyFileSync(legacyConfigPath, newConfigPath)
+      
+      console.log(`📦 Migrated configuration from ${legacyConfigPath} to ${newConfigPath}`)
+      console.log(`💡 You can safely remove the old ${legacyConfigPath} file if desired`)
+    } catch (error) {
+      console.warn(`⚠️  Failed to migrate config from ${legacyConfigPath}:`, (error as Error).message)
+      console.warn(`   Please manually copy your configuration to ${newConfigPath}`)
+    }
+  }
+
+  /**
    * Load edge configuration (credentials and repositories)
    * Note: Strips promptTemplatePath from all repositories to ensure built-in template is used
    */
   loadEdgeConfig(): EdgeConfig {
-    const edgeConfigPath = './.edge-config.json'
+    // Migrate from legacy location if needed
+    this.migrateConfigIfNeeded()
+    
+    const edgeConfigPath = this.getEdgeConfigPath()
     let config: EdgeConfig = { repositories: [] }
     
     if (existsSync(edgeConfigPath)) {
@@ -93,7 +165,15 @@ class EdgeApp {
    * Save edge configuration
    */
   saveEdgeConfig(config: EdgeConfig): void {
-    writeFileSync('./.edge-config.json', JSON.stringify(config, null, 2))
+    const edgeConfigPath = this.getEdgeConfigPath()
+    const configDir = dirname(edgeConfigPath)
+    
+    // Ensure the ~/.cyrus directory exists
+    if (!existsSync(configDir)) {
+      mkdirSync(configDir, { recursive: true })
+    }
+    
+    writeFileSync(edgeConfigPath, JSON.stringify(config, null, 2))
   }
   
   /**
@@ -117,7 +197,10 @@ class EdgeApp {
       const repositoryPath = await question(`Repository path (default: ${process.cwd()}): `) || process.cwd()
       const repositoryName = await question(`Repository name (default: ${basename(repositoryPath)}): `) || basename(repositoryPath)
       const baseBranch = await question('Base branch (default: main): ') || 'main'
-      const workspaceBaseDir = await question(`Workspace directory (default: ${repositoryPath}/workspaces): `) || `${repositoryPath}/workspaces`
+      // Create a path-safe version of the repository name for namespacing
+      const repoNameSafe = repositoryName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase()
+      const defaultWorkspaceDir = resolve(homedir(), '.cyrus', 'workspaces', repoNameSafe)
+      const workspaceBaseDir = await question(`Workspace directory (default: ${defaultWorkspaceDir}): `) || defaultWorkspaceDir
       
       // Note: Prompt template is now hardcoded - no longer configurable
       
@@ -471,8 +554,18 @@ class EdgeApp {
       process.on('SIGINT', () => this.shutdown())
       process.on('SIGTERM', () => this.shutdown())
       
-    } catch (error) {
-      console.error('Failed to start edge application:', error)
+    } catch (error: any) {
+      console.error('\n❌ Failed to start edge application:', error.message)
+      
+      // Provide more specific guidance for common errors
+      if (error.message?.includes('Failed to connect any repositories')) {
+        console.error('\n💡 This usually happens when:')
+        console.error('   - All Linear OAuth tokens have expired')
+        console.error('   - The Linear API is temporarily unavailable')
+        console.error('   - Your network connection is having issues')
+        console.error('\nPlease check your edge configuration and try again.')
+      }
+      
       await this.shutdown()
       process.exit(1)
     }
@@ -651,9 +744,228 @@ class EdgeApp {
   }
 }
 
-// Create and start the app
-const app = new EdgeApp()
-app.start().catch(error => {
-  console.error('Fatal error:', error)
-  process.exit(1)
-})
+// Helper function to check Linear token status
+async function checkLinearToken(token: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const response = await fetch('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token
+      },
+      body: JSON.stringify({
+        query: '{ viewer { id email name } }'
+      })
+    })
+    
+    const data = await response.json() as any
+    
+    if (data.errors) {
+      return { valid: false, error: data.errors[0]?.message || 'Unknown error' }
+    }
+    
+    return { valid: true }
+  } catch (error) {
+    return { valid: false, error: (error as Error).message }
+  }
+}
+
+// Command: check-tokens
+async function checkTokensCommand() {
+  const app = new EdgeApp()
+  const configPath = app.getEdgeConfigPath()
+  
+  if (!existsSync(configPath)) {
+    console.error('No edge configuration found. Please run setup first.')
+    process.exit(1)
+  }
+  
+  const config = JSON.parse(readFileSync(configPath, 'utf-8')) as EdgeConfig
+  
+  console.log('Checking Linear tokens...\n')
+  
+  for (const repo of config.repositories) {
+    process.stdout.write(`${repo.name} (${repo.linearWorkspaceName}): `)
+    const result = await checkLinearToken(repo.linearToken)
+    
+    if (result.valid) {
+      console.log('✅ Valid')
+    } else {
+      console.log(`❌ Invalid - ${result.error}`)
+    }
+  }
+}
+
+// Command: refresh-token
+async function refreshTokenCommand() {
+  const app = new EdgeApp()
+  const configPath = app.getEdgeConfigPath()
+  
+  if (!existsSync(configPath)) {
+    console.error('No edge configuration found. Please run setup first.')
+    process.exit(1)
+  }
+  
+  const config = JSON.parse(readFileSync(configPath, 'utf-8')) as EdgeConfig
+  
+  // Show repositories with their token status
+  console.log('Checking current token status...\n')
+  const tokenStatuses: Array<{ repo: RepositoryConfig; valid: boolean }> = []
+  
+  for (const repo of config.repositories) {
+    const result = await checkLinearToken(repo.linearToken)
+    tokenStatuses.push({ repo, valid: result.valid })
+    console.log(`${tokenStatuses.length}. ${repo.name} (${repo.linearWorkspaceName}): ${result.valid ? '✅ Valid' : '❌ Invalid'}`)
+  }
+  
+  // Ask which token to refresh
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  })
+  
+  const answer = await new Promise<string>(resolve => {
+    rl.question('\nWhich repository token would you like to refresh? (Enter number or "all"): ', resolve)
+  })
+  
+  const indicesToRefresh: number[] = []
+  
+  if (answer.toLowerCase() === 'all') {
+    indicesToRefresh.push(...Array.from({ length: tokenStatuses.length }, (_, i) => i))
+  } else {
+    const index = parseInt(answer) - 1
+    if (isNaN(index) || index < 0 || index >= tokenStatuses.length) {
+      console.error('Invalid selection')
+      rl.close()
+      process.exit(1)
+    }
+    indicesToRefresh.push(index)
+  }
+  
+  // Refresh tokens
+  for (const index of indicesToRefresh) {
+    const tokenStatus = tokenStatuses[index]
+    if (!tokenStatus) continue
+    
+    const { repo } = tokenStatus
+    console.log(`\nRefreshing token for ${repo.name} (${repo.linearWorkspaceName || repo.linearWorkspaceId})...`)
+    console.log('Opening Linear OAuth flow in your browser...')
+    
+    // Use the proxy's OAuth flow with a callback to localhost
+    const callbackUrl = `http://localhost:3456/callback`
+    const oauthUrl = `https://cyrus-proxy.ceedar.workers.dev/oauth/authorize?callback=${encodeURIComponent(callbackUrl)}`
+    
+    console.log(`\nPlease complete the OAuth flow in your browser.`)
+    console.log(`If the browser doesn't open automatically, visit:\n${oauthUrl}\n`)
+    
+    // Start a temporary server to receive the OAuth callback
+    let tokenReceived: string | null = null
+    
+    const server = await new Promise<any>((resolve) => {
+      const s = http.createServer((req: any, res: any) => {
+        if (req.url?.startsWith('/callback')) {
+          const url = new URL(req.url, `http://localhost:3456`)
+          tokenReceived = url.searchParams.get('token')
+          
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+          res.end(`
+            <html>
+              <head>
+                <meta charset="UTF-8">
+              </head>
+              <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                <h2>✅ Authorization successful!</h2>
+                <p>You can close this window and return to your terminal.</p>
+                <script>setTimeout(() => window.close(), 2000);</script>
+              </body>
+            </html>
+          `)
+        } else {
+          res.writeHead(404)
+          res.end('Not found')
+        }
+      })
+      s.listen(3456, () => {
+        console.log('Waiting for OAuth callback...')
+        resolve(s)
+      })
+    })
+    
+    await open(oauthUrl)
+    
+    // Wait for the token with timeout
+    const startTime = Date.now()
+    while (!tokenReceived && Date.now() - startTime < 120000) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    
+    server.close()
+    
+    const newToken = tokenReceived
+    
+    if (!newToken || !(newToken as string).startsWith('lin_oauth_')) {
+      console.error('Invalid token received from OAuth flow')
+      continue
+    }
+    
+    // Verify the new token
+    const verifyResult = await checkLinearToken(newToken)
+    if (!verifyResult.valid) {
+      console.error(`❌ New token is invalid: ${verifyResult.error}`)
+      continue
+    }
+    
+    // Update the config - update ALL repositories that had the same old token
+    const oldToken = repo.linearToken
+    let updatedCount = 0
+    
+    for (let i = 0; i < config.repositories.length; i++) {
+      const currentRepo = config.repositories[i]
+      if (currentRepo && currentRepo.linearToken === oldToken) {
+        currentRepo.linearToken = newToken
+        updatedCount++
+        console.log(`✅ Updated token for ${currentRepo.name}`)
+      }
+    }
+    
+    if (updatedCount > 1) {
+      console.log(`\n📝 Updated ${updatedCount} repositories that shared the same token`)
+    }
+  }
+  
+  // Save the updated config
+  writeFileSync(configPath, JSON.stringify(config, null, 2))
+  console.log('\n✅ Configuration saved')
+  
+  rl.close()
+}
+
+// Parse command
+const command = args[0] || 'start'
+
+// Execute appropriate command
+switch (command) {
+  case 'check-tokens':
+    checkTokensCommand().catch(error => {
+      console.error('Error:', error)
+      process.exit(1)
+    })
+    break
+    
+  case 'refresh-token':
+    refreshTokenCommand().catch(error => {
+      console.error('Error:', error)
+      process.exit(1)
+    })
+    break
+    
+  case 'start':
+  default:
+    // Create and start the app
+    const app = new EdgeApp()
+    app.start().catch(error => {
+      console.error('Fatal error:', error)
+      process.exit(1)
+    })
+    break
+}
