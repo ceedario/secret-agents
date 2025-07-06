@@ -18,6 +18,7 @@ export interface RepositoryConfig {
   
   // Linear configuration
   linearWorkspaceId: string    // Linear workspace/team ID
+  linearWorkspaceName?: string // Linear workspace display name (optional, for UI)
   linearToken: string          // OAuth token for this Linear workspace
   teamKeys?: string[]          // Linear team keys for routing (e.g., ["CEE", "BOOK"])
   

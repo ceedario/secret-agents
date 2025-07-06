@@ -32,7 +32,7 @@ export class EdgeWorkerRegistry {
     const workspaceIds = await this.validateLinearToken(registration.linearToken)
     
     if (!workspaceIds || workspaceIds.length === 0) {
-      throw new Error('Invalid token or no workspace access')
+      throw new Error('Authentication required, not authenticated')
     }
 
     // Generate webhook secret for this edge worker

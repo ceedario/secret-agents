@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Fixed streaming input sessions not properly cleaning up after completion
+  - Resolves issue where "I've queued up your message..." appeared even after sessions had resolved
+  - Properly closes input streams when Claude sessions complete naturally
+
+### Changed
+- Configuration file location moved from `.edge-config.json` in current directory to `~/.cyrus/config.json`
+  - Automatically migrates existing `.edge-config.json` files to the new location
+  - Uses standard user configuration directory for better cross-platform compatibility
+  - Reports migration status when detected
+- Default workspace directory changed from `{repository}/workspaces` to `~/.cyrus/workspaces/{repo-name}`
+  - Centralizes all cyrus-related files in the user's home directory
+  - Uses sanitized repository names as namespace folders
+  - Existing configurations remain unchanged
+
 ## [0.1.22] - 2025-01-06
 
 ### CLI

@@ -303,6 +303,12 @@ export class ClaudeRunner extends EventEmitter {
       // Clean up
       this.abortController = null
       
+      // Complete and clean up streaming prompt if it exists
+      if (this.streamingPrompt) {
+        this.streamingPrompt.complete()
+        this.streamingPrompt = null
+      }
+      
       // Close log stream
       if (this.logStream) {
         this.logStream.end()

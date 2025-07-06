@@ -47,6 +47,7 @@ export class EdgeWorker extends EventEmitter {
   private claudeRunners: Map<string, ClaudeRunner> = new Map()
   private sessionToRepo: Map<string, string> = new Map() // Maps session ID to repository ID
   private issueToCommentId: Map<string, string> = new Map() // Maps issue ID to initial comment ID
+  private tokenToClientId: Map<string, string> = new Map() // Maps token to NDJSON client ID
   private issueToReplyContext: Map<string, { commentId: string; parentId?: string }> = new Map() // Maps issue ID to reply context
   private sharedApplicationServer: SharedApplicationServer
 
@@ -87,9 +88,14 @@ export class EdgeWorker extends EventEmitter {
 
     // Create one NDJSON client per unique token using shared application server
     for (const [token, repos] of tokenToRepos) {
+      if (!repos || repos.length === 0) continue
+      const firstRepo = repos[0]
+      if (!firstRepo) continue
+      const primaryRepoId = firstRepo.id
       const ndjsonClient = new NdjsonClient({
         proxyUrl: config.proxyUrl,
         token: token,
+        name: repos.map(r => r.name).join(', '), // Pass repository names
         transport: 'webhook',
         // Use shared application server instead of individual servers
         useExternalWebhookServer: true,
@@ -100,8 +106,8 @@ export class EdgeWorker extends EventEmitter {
         ...(config.baseUrl && { webhookBaseUrl: config.baseUrl }),
         // Legacy fallback support
         ...(!config.baseUrl && config.webhookBaseUrl && { webhookBaseUrl: config.webhookBaseUrl }),
-        onConnect: () => this.handleConnect(token),
-        onDisconnect: (reason) => this.handleDisconnect(token, reason),
+        onConnect: () => this.handleConnect(primaryRepoId, repos),
+        onDisconnect: (reason) => this.handleDisconnect(primaryRepoId, repos, reason),
         onError: (error) => this.handleError(error)
       })
 
@@ -115,7 +121,12 @@ export class EdgeWorker extends EventEmitter {
         })
       }
 
-      this.ndjsonClients.set(token, ndjsonClient)
+      // Store with the first repo's ID as the key (for error messages)
+      // But also store the token mapping for lookup
+      this.ndjsonClients.set(primaryRepoId, ndjsonClient)
+      
+      // Store token to client mapping for other lookups if needed
+      this.tokenToClientId.set(token, primaryRepoId)
     }
   }
 
@@ -127,10 +138,52 @@ export class EdgeWorker extends EventEmitter {
     await this.sharedApplicationServer.start()
     
     // Connect all NDJSON clients
-    const connections = Array.from(this.ndjsonClients.values()).map(client => 
-      client.connect()
-    )
-    await Promise.all(connections)
+    const connections = Array.from(this.ndjsonClients.entries()).map(async ([repoId, client]) => {
+      try {
+        await client.connect()
+      } catch (error: any) {
+        const repoConfig = this.config.repositories.find(r => r.id === repoId)
+        const repoName = repoConfig?.name || repoId
+        
+        // Check if it's an authentication error
+        if (error.isAuthError || error.code === 'LINEAR_AUTH_FAILED') {
+          console.error(`\n❌ Linear authentication failed for repository: ${repoName}`)
+          console.error(`   Workspace: ${repoConfig?.linearWorkspaceName || repoConfig?.linearWorkspaceId || 'Unknown'}`)
+          console.error(`   Error: ${error.message}`)
+          console.error(`\n   To fix this issue:`)
+          console.error(`   1. Run: cyrus refresh-token`)
+          console.error(`   2. Complete the OAuth flow in your browser`)
+          console.error(`   3. The configuration will be automatically updated\n`)
+          console.error(`   You can also check all tokens with: cyrus check-tokens\n`)
+          
+          // Continue with other repositories instead of failing completely
+          return { repoId, success: false, error }
+        }
+        
+        // For other errors, still log but with less guidance
+        console.error(`\n❌ Failed to connect repository: ${repoName}`)
+        console.error(`   Error: ${error.message}\n`)
+        return { repoId, success: false, error }
+      }
+      return { repoId, success: true }
+    })
+    
+    const results = await Promise.all(connections)
+    const failures = results.filter(r => !r.success)
+    
+    if (failures.length === this.ndjsonClients.size) {
+      // All connections failed
+      throw new Error('Failed to connect any repositories. Please check your configuration and Linear tokens.')
+    } else if (failures.length > 0) {
+      // Some connections failed
+      console.warn(`\n⚠️  Connected ${results.length - failures.length} out of ${results.length} repositories`)
+      console.warn(`   The following repositories could not be connected:`)
+      failures.forEach(f => {
+        const repoConfig = this.config.repositories.find(r => r.id === f.repoId)
+        console.warn(`   - ${repoConfig?.name || f.repoId}`)
+      })
+      console.warn(`\n   Cyrus will continue running with the available repositories.\n`)
+    }
   }
 
   /**
@@ -161,7 +214,9 @@ export class EdgeWorker extends EventEmitter {
   /**
    * Handle connection established
    */
-  private handleConnect(token: string): void {
+  private handleConnect(clientId: string, repos: RepositoryConfig[]): void {
+    // Get the token for backward compatibility with events
+    const token = repos[0]?.linearToken || clientId
     this.emit('connected', token)
     // Connection logged by CLI app event handler
   }
@@ -169,7 +224,9 @@ export class EdgeWorker extends EventEmitter {
   /**
    * Handle disconnection
    */
-  private handleDisconnect(token: string, reason?: string): void {
+  private handleDisconnect(clientId: string, repos: RepositoryConfig[], reason?: string): void {
+    // Get the token for backward compatibility with events
+    const token = repos[0]?.linearToken || clientId
     this.emit('disconnected', token, reason)
   }
 
