@@ -218,13 +218,7 @@ This integration is automatically available in all Cyrus sessions - the EdgeWork
    - Use the CLI version number (e.g., `## [0.1.22] - 2025-01-06`)
    - Focus on end-user impact from the perspective of the `cyrus` CLI
 
-2. **Copy the updated changelog to the cyrus website**:
-   ```bash
-   # Copy the updated changelog to the website
-   cp CHANGELOG.md /Users/agentops/code/cyrus/cyrus-website/public/changelog.md
-   ```
-
-3. **Commit all changes**:
+2. **Commit all changes**:
    ```bash
    git add -A
    git commit -m "Prepare release v0.1.XX"
