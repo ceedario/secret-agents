@@ -954,8 +954,9 @@ export class EdgeWorker extends EventEmitter {
     console.log(`[EdgeWorker] Claude session completed for comment thread ${commentId} (issue ${issueId}) with ${messages.length} messages`)
     this.claudeRunners.delete(commentId)
     this.commentToRepo.delete(commentId)
+    // NOTE: Do NOT delete commentToIssue mapping here - this allows for continuation
+    // The mapping should only be deleted when the issue is unassigned or there's an error
     if (issueId) {
-      this.commentToIssue.delete(commentId)
       this.emit('session:ended', issueId, 0, repositoryId)  // 0 indicates success
       this.config.handlers?.onSessionEnd?.(issueId, 0, repositoryId)
     }
