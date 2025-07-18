@@ -40,7 +40,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@linear/sdk": "^39.0.0",
+    "@linear/sdk": "^52.0.0",
     "cyrus-core": "workspace:*",
     "cyrus-claude-runner": "workspace:*",
     "cyrus-edge-worker": "workspace:*",
