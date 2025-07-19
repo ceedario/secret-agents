@@ -9,7 +9,7 @@ import type {
   SDKAssistantMessage, 
   SDKResultMessage
 } from 'cyrus-claude-runner'
-import type { AgentSession, AgentSessionEntry } from 'cyrus-core'
+import type { AgentSession, AgentSessionEntry, SerializedAgentSession, SerializedAgentSessionEntry } from 'cyrus-core'
 
 /**
  * Manages Linear Agent Sessions integration with Claude Code SDK
@@ -392,9 +392,9 @@ export class AgentSessionManager {
   /**
    * Serialize Agent Session state for persistence
    */
-  serializeState(): { sessions: Record<string, any>, entries: Record<string, any[]> } {
-    const sessions: Record<string, any> = {}
-    const entries: Record<string, any[]> = {}
+  serializeState(): { sessions: Record<string, SerializedAgentSession>, entries: Record<string, SerializedAgentSessionEntry[]> } {
+    const sessions: Record<string, SerializedAgentSession> = {}
+    const entries: Record<string, SerializedAgentSessionEntry[]> = {}
 
     // Serialize sessions
     for (const [sessionId, session] of this.sessions.entries()) {
@@ -422,7 +422,7 @@ export class AgentSessionManager {
   /**
    * Restore Agent Session state from serialized data
    */
-  restoreState(serializedSessions: Record<string, any>, serializedEntries: Record<string, any[]>): void {
+  restoreState(serializedSessions: Record<string, SerializedAgentSession>, serializedEntries: Record<string, SerializedAgentSessionEntry[]>): void {
     // Clear existing state
     this.sessions.clear()
     this.entries.clear()

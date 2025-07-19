@@ -4,7 +4,7 @@ import { NdjsonClient } from 'cyrus-ndjson-client'
 import { ClaudeRunner, getSafeTools } from 'cyrus-claude-runner'
 import type { McpServerConfig } from 'cyrus-claude-runner'
 import { SessionManager, Session, PersistenceManager } from 'cyrus-core'
-import type { Issue as CoreIssue, SerializableEdgeWorkerState, AgentSession, AgentSessionEntry } from 'cyrus-core'
+import type { Issue as CoreIssue, SerializableEdgeWorkerState, SerializedAgentSession, SerializedAgentSessionEntry } from 'cyrus-core'
 import type {
   LinearWebhook,
   LinearIssueAssignedWebhook,
@@ -2098,8 +2098,8 @@ ${newComment ? `New comment to address:\n${newComment.body}\n\n` : ''}Please ana
     const sessionManagerState = this.sessionManager.serializeSessions()
 
     // Serialize Agent Session state for all repositories
-    const agentSessions: Record<string, Record<string, AgentSession>> = {}
-    const agentSessionEntries: Record<string, Record<string, AgentSessionEntry[]>> = {}
+    const agentSessions: Record<string, Record<string, SerializedAgentSession>> = {}
+    const agentSessionEntries: Record<string, Record<string, SerializedAgentSessionEntry[]>> = {}
     
     for (const [repositoryId, agentSessionManager] of this.agentSessionManagers.entries()) {
       const serializedState = agentSessionManager.serializeState()

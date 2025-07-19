@@ -38,3 +38,15 @@ export interface AgentSessionEntry {
     isError?: boolean
   }
 }
+
+// Serialized versions with Date fields as strings
+export interface SerializedAgentSession extends Omit<AgentSession, 'createdAt' | 'updatedAt'> {
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SerializedAgentSessionEntry extends Omit<AgentSessionEntry, 'metadata'> {
+  metadata?: Omit<AgentSessionEntry['metadata'], 'timestamp'> & {
+    timestamp?: string
+  }
+}
