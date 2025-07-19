@@ -9,42 +9,7 @@ import type {
   SDKAssistantMessage, 
   SDKResultMessage
 } from 'cyrus-claude-runner'
-
-// Internal Agent Session representation (simplified)
-export interface AgentSession {
-  id: string
-  type: LinearDocument.AgentSessionType
-  status: LinearDocument.AgentSessionStatus
-  context: LinearDocument.AgentSessionType.CommentThread
-  issueId: string
-  sessionId: string
-  createdAt: Date
-  updatedAt: Date
-  linearContextId?: string // Track Linear AgentContext ID
-  metadata?: {
-    model?: string
-    tools?: string[]
-    permissionMode?: string
-    apiKeySource?: string
-    totalCostUsd?: number
-    usage?: any
-  }
-}
-
-export interface AgentSessionEntry {
-  id: string
-  sessionId: string
-  type: 'user' | 'assistant' | 'system' | 'result'
-  content: string
-  linearActivityId?: string // Track Linear AgentActivity ID
-  metadata?: {
-    toolUseId?: string
-    parentToolUseId?: string
-    timestamp: Date
-    durationMs?: number
-    isError?: boolean
-  }
-}
+import type { AgentSession, AgentSessionEntry } from 'cyrus-core'
 
 /**
  * Manages Linear Agent Sessions integration with Claude Code SDK
@@ -66,9 +31,9 @@ export class AgentSessionManager {
   async createSession(systemMessage: SDKSystemMessage, issueId: string): Promise<AgentSession> {
     const agentSession: AgentSession = {
       id: this.generateId(),
-      type: LinearDocument.AgentSessionType.CommentThread,
-      status: LinearDocument.AgentSessionStatus.Active,
-      context: LinearDocument.AgentSessionType.CommentThread,
+      type: 'commentThread', // LinearDocument.AgentSessionType.CommentThread
+      status: 'active', // LinearDocument.AgentSessionStatus.Active
+      context: 'commentThread', // LinearDocument.AgentSessionType.CommentThread
       issueId,
       sessionId: systemMessage.session_id,
       createdAt: new Date(),
@@ -131,8 +96,8 @@ export class AgentSessionManager {
     }
 
     const status = resultMessage.subtype === 'success' 
-      ? LinearDocument.AgentSessionStatus.Complete 
-      : LinearDocument.AgentSessionStatus.Error
+      ? 'complete' // LinearDocument.AgentSessionStatus.Complete 
+      : 'error' // LinearDocument.AgentSessionStatus.Error
 
     // Update session status and metadata
     await this.updateSessionStatus(sessionId, status, {
@@ -173,7 +138,7 @@ export class AgentSessionManager {
     } catch (error) {
       console.error(`[AgentSessionManager] Error handling message:`, error)
       // Mark session as error state
-      await this.updateSessionStatus(sessionId, LinearDocument.AgentSessionStatus.Error)
+      await this.updateSessionStatus(sessionId, 'error') // LinearDocument.AgentSessionStatus.Error
     }
   }
 
@@ -182,7 +147,7 @@ export class AgentSessionManager {
    */
   private async updateSessionStatus(
     sessionId: string, 
-    status: LinearDocument.AgentSessionStatus, 
+    status: string, // AgentSessionStatus 
     additionalMetadata?: Partial<AgentSession['metadata']>
   ): Promise<void> {
     const session = this.sessions.get(sessionId)
@@ -277,7 +242,7 @@ export class AgentSessionManager {
         commentId: session.issueId, // Using issueId as placeholder
         creatorId: 'system', // Placeholder - should be actual user ID
         sourceUrl: `https://linear.app/issue/${session.issueId}`, // Placeholder URL
-        type: session.type
+        type: LinearDocument.AgentSessionType.CommentThread // Use actual enum value for API
       }
 
       // Create AgentContext in Linear
@@ -377,7 +342,7 @@ export class AgentSessionManager {
    */
   getActiveSessions(): AgentSession[] {
     return Array.from(this.sessions.values()).filter(
-      session => session.status === LinearDocument.AgentSessionStatus.Active
+      session => session.status === 'active' // LinearDocument.AgentSessionStatus.Active
     )
   }
 
@@ -395,7 +360,7 @@ export class AgentSessionManager {
    */
   getActiveSessionsByIssueId(issueId: string): AgentSession[] {
     return Array.from(this.sessions.values()).filter(
-      session => session.issueId === issueId && session.status === LinearDocument.AgentSessionStatus.Active
+      session => session.issueId === issueId && session.status === 'active' // LinearDocument.AgentSessionStatus.Active
     )
   }
 
@@ -414,7 +379,7 @@ export class AgentSessionManager {
     
     for (const [sessionId, session] of this.sessions.entries()) {
       if (
-        (session.status === LinearDocument.AgentSessionStatus.Complete || session.status === LinearDocument.AgentSessionStatus.Error) &&
+        (session.status === 'complete' || session.status === 'error') &&
         session.updatedAt < cutoff
       ) {
         this.sessions.delete(sessionId)

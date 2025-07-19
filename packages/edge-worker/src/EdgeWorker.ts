@@ -1,10 +1,10 @@
 import { EventEmitter } from 'events'
-import { LinearClient, LinearDocument, Issue as LinearIssue, Comment } from '@linear/sdk'
+import { LinearClient, Issue as LinearIssue, Comment } from '@linear/sdk'
 import { NdjsonClient } from 'cyrus-ndjson-client'
 import { ClaudeRunner, getSafeTools } from 'cyrus-claude-runner'
 import type { McpServerConfig } from 'cyrus-claude-runner'
 import { SessionManager, Session, PersistenceManager } from 'cyrus-core'
-import type { Issue as CoreIssue, SerializableEdgeWorkerState } from 'cyrus-core'
+import type { Issue as CoreIssue, SerializableEdgeWorkerState, AgentSession, AgentSessionEntry } from 'cyrus-core'
 import type {
   LinearWebhook,
   LinearIssueAssignedWebhook,
@@ -15,7 +15,7 @@ import type {
   LinearWebhookComment
 } from 'cyrus-core'
 import { SharedApplicationServer } from './SharedApplicationServer.js'
-import { AgentSessionManager, AgentSession, AgentSessionEntry } from './AgentSessionManager.js'
+import { AgentSessionManager } from './AgentSessionManager.js'
 import {
   isIssueAssignedWebhook,
   isIssueCommentMentionWebhook,
@@ -998,7 +998,7 @@ export class EdgeWorker extends EventEmitter {
       for (const message of messages) {
         if ('session_id' in message && message.session_id) {
           const session = agentSessionManager.getSession(message.session_id)
-          if (session && session.status !== LinearDocument.AgentSessionStatus.Complete && session.status !== LinearDocument.AgentSessionStatus.Error) {
+          if (session && session.status !== 'complete' && session.status !== 'error') {
             // Create a synthetic success result message to mark session complete
             const syntheticResult = {
               type: 'result' as const,

@@ -1,5 +1,6 @@
 export { EdgeWorker } from './EdgeWorker.js'
 export { SharedApplicationServer } from './SharedApplicationServer.js'
+export { AgentSessionManager } from './AgentSessionManager.js'
 export type {
   EdgeWorkerConfig,
   EdgeWorkerEvents,
