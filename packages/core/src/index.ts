@@ -3,6 +3,7 @@ export type { SessionOptions, Issue, Workspace, NarrativeItem } from './Session.
 export { SessionManager } from './SessionManager.js'
 export { PersistenceManager } from './PersistenceManager.js'
 export type { SerializableSession, SerializableEdgeWorkerState } from './PersistenceManager.js'
+export type { AgentSession, AgentSessionEntry, SerializedAgentSession, SerializedAgentSessionEntry } from './agent-session.js'
 
 // Webhook types
 export type {

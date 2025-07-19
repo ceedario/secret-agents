@@ -21,8 +21,8 @@ importers:
   apps/cli:
     dependencies:
       '@linear/sdk':
-        specifier: ^39.0.0
-        version: 39.2.1(encoding@0.1.13)
+        specifier: ^52.0.0
+        version: 52.0.0(encoding@0.1.13)
       cyrus-claude-runner:
         specifier: workspace:*
         version: link:../../packages/claude-runner
@@ -225,8 +225,8 @@ importers:
   packages/claude-runner:
     dependencies:
       '@anthropic-ai/claude-code':
-        specifier: ^1.0.43
-        version: 1.0.43
+        specifier: ^1.0.53
+        version: 1.0.53
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -256,8 +256,8 @@ importers:
   packages/edge-worker:
     dependencies:
       '@linear/sdk':
-        specifier: ^39.0.0
-        version: 39.2.1(encoding@0.1.13)
+        specifier: ^52.0.0
+        version: 52.0.0(encoding@0.1.13)
       '@ngrok/ngrok':
         specifier: ^1.5.1
         version: 1.5.1
@@ -315,8 +315,8 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@anthropic-ai/claude-code@1.0.43':
-    resolution: {integrity: sha512-VnuRK4s/R9ZRTkwH4gUjsp4SiBQXq7Y0B47OtgeXIZYVQYkhTW8m+E0IisFzXXFIyTQrE0SodGCpvgLhAYzGCg==}
+  '@anthropic-ai/claude-code@1.0.53':
+    resolution: {integrity: sha512-YE7PKtU1VPLtI3kCI4lvQyR+GE6v18ZvigO2mZqUUCqw537jeRMpAtVCtrp/onAuWUdHBYm7GhV0yDtsVc5Vug==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -1029,8 +1029,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
-  '@linear/sdk@39.2.1':
-    resolution: {integrity: sha512-tSqrS89HHrHdpShhqQK3eqVjtQkOWR585dKumBUZTt4Fl+B1NbpxofJcPX2G9YawvhHWpVKxcntwSrS0Mnm0QQ==}
+  '@linear/sdk@52.0.0':
+    resolution: {integrity: sha512-Dd8fPBcMa0E3Az8v2mICyAjCMF5169dx1TDhF6LrWZbQCeg3xXkL7uZUuvljC79XmK1cG/IRj+iHE0ekepMkUw==}
     engines: {node: '>=12.x', yarn: 1.x}
 
   '@malept/cross-spawn-promise@2.0.0':
@@ -4419,7 +4419,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.8
       '@jridgewell/trace-mapping': 0.3.25
 
-  '@anthropic-ai/claude-code@1.0.43':
+  '@anthropic-ai/claude-code@1.0.53':
     optionalDependencies:
       '@img/sharp-darwin-arm64': 0.33.5
       '@img/sharp-darwin-x64': 0.33.5
@@ -5032,7 +5032,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
 
-  '@linear/sdk@39.2.1(encoding@0.1.13)':
+  '@linear/sdk@52.0.0(encoding@0.1.13)':
     dependencies:
       '@graphql-typed-document-node/core': 3.2.0(graphql@15.10.1)
       graphql: 15.10.1

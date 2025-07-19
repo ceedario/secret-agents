@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import { existsSync } from 'fs'
+import type { SerializedAgentSession, SerializedAgentSessionEntry } from './agent-session.js'
 
 /**
  * Serializable session state for persistence
@@ -34,6 +35,9 @@ export interface SerializableEdgeWorkerState {
   issueToReplyContext: Record<string, { commentId: string; parentId?: string }>
   sessionsByCommentId: Record<string, SerializableSession>
   sessionsByIssueId: Record<string, SerializableSession[]>
+  // Agent Session state - keyed by repository ID
+  agentSessions?: Record<string, Record<string, SerializedAgentSession>>
+  agentSessionEntries?: Record<string, Record<string, SerializedAgentSessionEntry[]>>
 }
 
 /**
