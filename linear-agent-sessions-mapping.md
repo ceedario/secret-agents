@@ -409,10 +409,10 @@ class AgentSessionManager {
 - **Responsibility**: Transform Claude Code SDK messages to Linear Agent Sessions
 - **Key Methods**: `processSDKMessage()`, `createAgentSession()`, `updateSessionStatus()`
 
-### 2. Linear Issue Service
-- **Location**: `apps/cli/services/LinearIssueService.mjs`
-- **Responsibility**: Send Agent Sessions to Linear API
-- **Key Methods**: `postAgentSession()`, `updateAgentSession()`, `addSessionEntry()`
+### 2. Edge Worker Linear Integration
+- **Location**: `packages/edge-worker/src/EdgeWorker.ts`
+- **Responsibility**: Manages Linear SDK clients, processes webhooks, handles issue assignment/comments, and posts responses to Linear
+- **Key Methods**: `handleIssueAssigned()`, `handleNewComment()`, `postComment()`, `moveIssueToStartedState()`
 
 ### 3. Edge Worker Integration
 - **Location**: `packages/edge-worker/src/EdgeWorker.ts`
