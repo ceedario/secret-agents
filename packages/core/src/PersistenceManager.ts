@@ -34,6 +34,9 @@ export interface SerializableEdgeWorkerState {
   issueToReplyContext: Record<string, { commentId: string; parentId?: string }>
   sessionsByCommentId: Record<string, SerializableSession>
   sessionsByIssueId: Record<string, SerializableSession[]>
+  // Agent Session state - keyed by repository ID
+  agentSessions?: Record<string, Record<string, any>> // Maps repositoryId -> sessionId -> AgentSession
+  agentSessionEntries?: Record<string, Record<string, any[]>> // Maps repositoryId -> sessionId -> AgentSessionEntry[]
 }
 
 /**

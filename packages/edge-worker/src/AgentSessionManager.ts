@@ -382,6 +382,31 @@ export class AgentSessionManager {
   }
 
   /**
+   * Get sessions by issue ID
+   */
+  getSessionsByIssueId(issueId: string): AgentSession[] {
+    return Array.from(this.sessions.values()).filter(
+      session => session.issueId === issueId
+    )
+  }
+
+  /**
+   * Get active sessions by issue ID
+   */
+  getActiveSessionsByIssueId(issueId: string): AgentSession[] {
+    return Array.from(this.sessions.values()).filter(
+      session => session.issueId === issueId && session.status === LinearDocument.AgentSessionStatus.Active
+    )
+  }
+
+  /**
+   * Get all sessions
+   */
+  getAllSessions(): AgentSession[] {
+    return Array.from(this.sessions.values())
+  }
+
+  /**
    * Clear completed sessions older than specified time
    */
   cleanup(olderThanMs: number = 24 * 60 * 60 * 1000): void {
@@ -397,5 +422,68 @@ export class AgentSessionManager {
         console.log(`[AgentSessionManager] Cleaned up session ${sessionId}`)
       }
     }
+  }
+
+  /**
+   * Serialize Agent Session state for persistence
+   */
+  serializeState(): { sessions: Record<string, any>, entries: Record<string, any[]> } {
+    const sessions: Record<string, any> = {}
+    const entries: Record<string, any[]> = {}
+
+    // Serialize sessions
+    for (const [sessionId, session] of this.sessions.entries()) {
+      sessions[sessionId] = {
+        ...session,
+        createdAt: session.createdAt.toISOString(),
+        updatedAt: session.updatedAt.toISOString()
+      }
+    }
+
+    // Serialize entries
+    for (const [sessionId, sessionEntries] of this.entries.entries()) {
+      entries[sessionId] = sessionEntries.map(entry => ({
+        ...entry,
+        metadata: {
+          ...entry.metadata,
+          timestamp: entry.metadata?.timestamp?.toISOString()
+        }
+      }))
+    }
+
+    return { sessions, entries }
+  }
+
+  /**
+   * Restore Agent Session state from serialized data
+   */
+  restoreState(serializedSessions: Record<string, any>, serializedEntries: Record<string, any[]>): void {
+    // Clear existing state
+    this.sessions.clear()
+    this.entries.clear()
+
+    // Restore sessions
+    for (const [sessionId, sessionData] of Object.entries(serializedSessions)) {
+      const session: AgentSession = {
+        ...sessionData,
+        createdAt: new Date(sessionData.createdAt),
+        updatedAt: new Date(sessionData.updatedAt)
+      }
+      this.sessions.set(sessionId, session)
+    }
+
+    // Restore entries
+    for (const [sessionId, entriesData] of Object.entries(serializedEntries)) {
+      const sessionEntries: AgentSessionEntry[] = entriesData.map(entryData => ({
+        ...entryData,
+        metadata: {
+          ...entryData.metadata,
+          timestamp: entryData.metadata?.timestamp ? new Date(entryData.metadata.timestamp) : new Date()
+        }
+      }))
+      this.entries.set(sessionId, sessionEntries)
+    }
+
+    console.log(`[AgentSessionManager] Restored ${this.sessions.size} sessions and ${Object.keys(serializedEntries).length} entry collections`)
   }
 }

@@ -2023,6 +2023,37 @@ ${newComment ? `New comment to address:\n${newComment.body}\n\n` : ''}Please ana
   }
 
   /**
+   * Get Agent Sessions for a comment thread
+   */
+  public getAgentSessionsForCommentThread(commentId: string): any[] {
+    const repositoryId = this.commentToRepo.get(commentId)
+    const issueId = this.commentToIssue.get(commentId)
+    
+    if (!repositoryId || !issueId) {
+      return []
+    }
+    
+    const agentSessionManager = this.agentSessionManagers.get(repositoryId)
+    if (!agentSessionManager) {
+      return []
+    }
+    
+    return agentSessionManager.getSessionsByIssueId(issueId)
+  }
+
+  /**
+   * Get Agent Sessions for an issue
+   */
+  public getAgentSessionsForIssue(issueId: string, repositoryId: string): any[] {
+    const agentSessionManager = this.agentSessionManagers.get(repositoryId)
+    if (!agentSessionManager) {
+      return []
+    }
+    
+    return agentSessionManager.getSessionsByIssueId(issueId)
+  }
+
+  /**
    * Load persisted EdgeWorker state for all repositories
    */
   private async loadPersistedState(): Promise<void> {
@@ -2066,6 +2097,16 @@ ${newComment ? `New comment to address:\n${newComment.body}\n\n` : ''}Please ana
     // Serialize session manager state
     const sessionManagerState = this.sessionManager.serializeSessions()
 
+    // Serialize Agent Session state for all repositories
+    const agentSessions: Record<string, Record<string, any>> = {}
+    const agentSessionEntries: Record<string, Record<string, any[]>> = {}
+    
+    for (const [repositoryId, agentSessionManager] of this.agentSessionManagers.entries()) {
+      const serializedState = agentSessionManager.serializeState()
+      agentSessions[repositoryId] = serializedState.sessions
+      agentSessionEntries[repositoryId] = serializedState.entries
+    }
+
     return {
       commentToRepo: PersistenceManager.mapToRecord(this.commentToRepo),
       commentToIssue: PersistenceManager.mapToRecord(this.commentToIssue),
@@ -2073,7 +2114,9 @@ ${newComment ? `New comment to address:\n${newComment.body}\n\n` : ''}Please ana
       issueToCommentThreads,
       issueToReplyContext: PersistenceManager.mapToRecord(this.issueToReplyContext),
       sessionsByCommentId: sessionManagerState.sessionsByCommentId,
-      sessionsByIssueId: sessionManagerState.sessionsByIssueId
+      sessionsByIssueId: sessionManagerState.sessionsByIssueId,
+      agentSessions,
+      agentSessionEntries
     }
   }
 
@@ -2098,6 +2141,19 @@ ${newComment ? `New comment to address:\n${newComment.body}\n\n` : ''}Please ana
       sessionsByCommentId: state.sessionsByCommentId,
       sessionsByIssueId: state.sessionsByIssueId
     })
+
+    // Restore Agent Session state for all repositories
+    if (state.agentSessions && state.agentSessionEntries) {
+      for (const [repositoryId, agentSessionManager] of this.agentSessionManagers.entries()) {
+        const repositorySessions = state.agentSessions[repositoryId] || {}
+        const repositoryEntries = state.agentSessionEntries[repositoryId] || {}
+        
+        if (Object.keys(repositorySessions).length > 0 || Object.keys(repositoryEntries).length > 0) {
+          agentSessionManager.restoreState(repositorySessions, repositoryEntries)
+          console.log(`[EdgeWorker] Restored Agent Session state for repository ${repositoryId}`)
+        }
+      }
+    }
   }
 
   /**
