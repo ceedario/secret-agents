@@ -15,7 +15,7 @@ import type {
   LinearWebhookComment
 } from 'cyrus-core'
 import { SharedApplicationServer } from './SharedApplicationServer.js'
-import { AgentSessionManager } from './AgentSessionManager.js'
+import { AgentSessionManager, AgentSession, AgentSessionEntry } from './AgentSessionManager.js'
 import {
   isIssueAssignedWebhook,
   isIssueCommentMentionWebhook,
@@ -2098,8 +2098,8 @@ ${newComment ? `New comment to address:\n${newComment.body}\n\n` : ''}Please ana
     const sessionManagerState = this.sessionManager.serializeSessions()
 
     // Serialize Agent Session state for all repositories
-    const agentSessions: Record<string, Record<string, any>> = {}
-    const agentSessionEntries: Record<string, Record<string, any[]>> = {}
+    const agentSessions: Record<string, Record<string, AgentSession>> = {}
+    const agentSessionEntries: Record<string, Record<string, AgentSessionEntry[]>> = {}
     
     for (const [repositoryId, agentSessionManager] of this.agentSessionManagers.entries()) {
       const serializedState = agentSessionManager.serializeState()
