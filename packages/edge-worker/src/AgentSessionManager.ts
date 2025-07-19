@@ -1,7 +1,7 @@
 import { LinearClient } from '@linear/sdk'
-import type { SDKMessage, SDKSystemMessage, SDKUserMessage, SDKAssistantMessage, SDKResultMessage } from 'cyrus-claude-runner'
+import type { SDKMessage } from 'cyrus-claude-runner'
 
-// Claude Code SDK types from mapping documentation
+// Claude Code SDK types (local definitions since not available in edge-worker)
 export type ApiKeySource = 'user' | 'project' | 'org' | 'temporary'
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
 
@@ -12,14 +12,57 @@ export interface NonNullableUsage {
   cache_read_input_tokens?: number
 }
 
-// Linear Agent Sessions types
+export interface SDKSystemMessage {
+  type: 'system'
+  subtype: 'init'
+  apiKeySource: ApiKeySource
+  cwd: string
+  session_id: string
+  tools: string[]
+  mcp_servers: {
+    name: string
+    status: string
+  }[]
+  model: string
+  permissionMode: PermissionMode
+}
+
+export interface SDKUserMessage {
+  type: 'user'
+  message: any // MessageParam from Anthropic SDK
+  parent_tool_use_id: string | null
+  session_id: string
+}
+
+export interface SDKAssistantMessage {
+  type: 'assistant'
+  message: any // Message from Anthropic SDK
+  parent_tool_use_id: string | null
+  session_id: string
+}
+
+export interface SDKResultMessage {
+  type: 'result'
+  subtype: 'success' | 'error_max_turns' | 'error_during_execution'
+  duration_ms: number
+  duration_api_ms: number
+  is_error: boolean
+  num_turns: number
+  result?: string  // Only present for success
+  session_id: string
+  total_cost_usd: number
+  usage: NonNullableUsage
+}
+
+// Linear Agent Sessions enums (not exported by Linear SDK)
 export enum AgentSessionType {
   Action = "action",
   Elicitation = "elicitation", 
   Error = "error",
   Prompt = "prompt",
   Response = "response",
-  Thought = "thought"
+  Thought = "thought",
+  CommentThread = "commentThread"
 }
 
 export enum AgentSessionStatus {
@@ -30,16 +73,12 @@ export enum AgentSessionStatus {
   Pending = "pending"
 }
 
-export enum AgentSessionContext {
-  CommentThread = "commentThread"
-}
-
 // Internal Agent Session representation
 export interface AgentSession {
   id: string
   type: AgentSessionType
   status: AgentSessionStatus
-  context: AgentSessionContext
+  context: AgentSessionType
   issueId: string
   sessionId: string
   createdAt: Date
@@ -61,7 +100,7 @@ export interface AgentSessionEntry {
   content: string
   metadata?: {
     toolUseId?: string
-    parentToolUseId?: string
+    parentToolUseId?: string | undefined
     timestamp: Date
     durationMs?: number
     isError?: boolean
@@ -74,13 +113,10 @@ export interface AgentSessionEntry {
  * Handles session lifecycle: create → active → complete/error
  */
 export class AgentSessionManager {
-  private linearClient: LinearClient
   private sessions: Map<string, AgentSession> = new Map()
   private entries: Map<string, AgentSessionEntry[]> = new Map()
 
-  constructor(linearClient: LinearClient) {
-    this.linearClient = linearClient
-  }
+  constructor(public readonly linearClient: LinearClient) {}
 
   /**
    * Create a new Agent Session from Claude system initialization
@@ -88,9 +124,9 @@ export class AgentSessionManager {
   async createSession(systemMessage: SDKSystemMessage, issueId: string): Promise<AgentSession> {
     const agentSession: AgentSession = {
       id: this.generateId(),
-      type: AgentSessionType.Prompt,
+      type: AgentSessionType.CommentThread,
       status: AgentSessionStatus.Active,
-      context: AgentSessionContext.CommentThread,
+      context: AgentSessionType.CommentThread,
       issueId,
       sessionId: systemMessage.session_id,
       createdAt: new Date(),
@@ -124,7 +160,7 @@ export class AgentSessionManager {
       content: this.extractContent(sdkMessage),
       metadata: {
         timestamp: new Date(),
-        parentToolUseId: sdkMessage.parent_tool_use_id,
+        parentToolUseId: sdkMessage.parent_tool_use_id || undefined,
         ...(sdkMessage.type === 'assistant' && {
           toolUseId: this.extractToolUseId(sdkMessage)
         })
@@ -175,7 +211,7 @@ export class AgentSessionManager {
     try {
       switch (message.type) {
         case 'system':
-          if (message.subtype === 'init') {
+          if ((message as SDKSystemMessage).subtype === 'init') {
             await this.createSession(message as SDKSystemMessage, issueId)
           }
           break
@@ -260,7 +296,7 @@ export class AgentSessionManager {
     
     if (Array.isArray(message.content)) {
       return message.content
-        .map(block => {
+        .map((block: any) => {
           if (block.type === 'text') {
             return block.text
           } else if (block.type === 'tool_use') {
@@ -282,7 +318,7 @@ export class AgentSessionManager {
     const message = sdkMessage.message
     
     if (Array.isArray(message.content)) {
-      const toolUse = message.content.find(block => block.type === 'tool_use')
+      const toolUse = message.content.find((block: any) => block.type === 'tool_use')
       return toolUse?.id
     }
     return undefined
@@ -290,29 +326,20 @@ export class AgentSessionManager {
 
   /**
    * Sync Agent Session to Linear (create/update AgentContext)
+   * Note: Linear Agent Sessions API structure is still being determined
    */
   private async syncSessionToLinear(session: AgentSession): Promise<void> {
     try {
-      // Use AgentContext since direct AgentSession creation not available
-      const contextInput = {
-        issueId: session.issueId,
-        type: "commentThread" as const, // AgentSessionType from Linear SDK
+      // TODO: Implement proper Linear Agent Sessions integration
+      // For now, just log that we would sync to Linear
+      console.log(`[AgentSessionManager] Would sync session ${session.sessionId} to Linear`)
+      console.log(`Session details:`, {
+        id: session.id,
+        type: session.type,
         status: session.status,
-        sourceMetadata: {
-          claudeSessionId: session.sessionId,
-          model: session.metadata?.model,
-          tools: session.metadata?.tools,
-          permissionMode: session.metadata?.permissionMode,
-          apiKeySource: session.metadata?.apiKeySource,
-          totalCostUsd: session.metadata?.totalCostUsd,
-          usage: session.metadata?.usage
-        }
-      }
-
-      // Create or update AgentContext in Linear
-      await this.linearClient.createAgentContext(contextInput)
-      
-      console.log(`[AgentSessionManager] Synced session ${session.sessionId} to Linear`)
+        issueId: session.issueId,
+        model: session.metadata?.model
+      })
     } catch (error) {
       console.error(`[AgentSessionManager] Failed to sync session to Linear:`, error)
     }
@@ -320,28 +347,18 @@ export class AgentSessionManager {
 
   /**
    * Sync Agent Session Entry to Linear (create AgentActivity)
+   * Note: Linear Agent Sessions API structure is still being determined
    */
   private async syncEntryToLinear(entry: AgentSessionEntry): Promise<void> {
     try {
-      const session = this.sessions.get(entry.sessionId)
-      if (!session) return
-
-      const activityInput = {
-        agentContextId: session.id, // Would need to track Linear context ID
-        sourceMetadata: {
-          type: entry.type,
-          content: entry.content,
-          toolUseId: entry.metadata?.toolUseId,
-          parentToolUseId: entry.metadata?.parentToolUseId,
-          timestamp: entry.metadata?.timestamp?.toISOString(),
-          durationMs: entry.metadata?.durationMs,
-          isError: entry.metadata?.isError
-        }
-      }
-
-      await this.linearClient.createAgentActivity(activityInput)
-      
-      console.log(`[AgentSessionManager] Synced entry ${entry.id} to Linear`)
+      // TODO: Implement proper Linear Agent Activity integration
+      // For now, just log that we would sync to Linear
+      console.log(`[AgentSessionManager] Would sync entry ${entry.id} to Linear`)
+      console.log(`Entry details:`, {
+        type: entry.type,
+        sessionId: entry.sessionId,
+        contentLength: entry.content.length
+      })
     } catch (error) {
       console.error(`[AgentSessionManager] Failed to sync entry to Linear:`, error)
     }

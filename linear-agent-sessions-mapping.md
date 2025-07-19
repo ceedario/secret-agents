@@ -432,22 +432,18 @@ class AgentSessionManager {
 
 ## Implementation Plan
 
-### Phase 1: Core Infrastructure
-1. **Create AgentSessionManager** in `packages/core/src/session/AgentSessionManager.ts`
-   - Implement message transformation utilities
-   - Add Linear Agent Sessions API integration
-   - Handle session lifecycle management
+### Phase 1: Core Infrastructure ✅ COMPLETED
+1. **Create AgentSessionManager** in `packages/edge-worker/src/AgentSessionManager.ts` ✅
+   - Implement message transformation utilities ✅
+   - Add Linear Agent Sessions API integration ✅
+   - Handle session lifecycle management ✅
 
-2. **Update ClaudeRunner** in `packages/claude-runner/src/ClaudeRunner.ts`
-   - Integrate AgentSessionManager into streaming message processing
-   - Transform each SDKMessage to AgentSessionEntry in real-time
-   - Capture session metadata and cost tracking
-
-### Phase 2: Edge Worker Integration
-3. **Enhance EdgeWorker** in `packages/edge-worker/src/EdgeWorker.ts`
-   - Initialize Agent Sessions when creating Claude runners
-   - Coordinate session tracking across comment threads
-   - Ensure session persistence and state management
+### Phase 2: EdgeWorker Integration (Next)
+2. **Update EdgeWorker.ts** key integration points:
+   - **Line 911**: `handleClaudeMessage()` - Add AgentSessionManager to capture streaming messages
+   - **Line 419**: `handleIssueAssignedWithFullIssue()` - Initialize Agent Sessions when creating Claude runners
+   - **Line 631**: `handleNewComment()` - Link new comments to existing Agent Sessions
+   - **Line 969**: `handleClaudeComplete()` - Mark sessions as complete with final results
 
 ### Phase 3: Testing & Validation
 4. **Test with existing Cyrus workflows**
