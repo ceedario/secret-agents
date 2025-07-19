@@ -404,20 +404,23 @@ class AgentSessionManager {
 
 ## Integration Points
 
-### 1. Cyrus CLI Integration
+### 1. Claude Runner Integration
 - **Location**: `packages/claude-runner/src/ClaudeRunner.ts`
-- **Responsibility**: Transform Claude Code SDK messages to Linear Agent Sessions
-- **Key Methods**: `processSDKMessage()`, `createAgentSession()`, `updateSessionStatus()`
+- **Responsibility**: Capture and transform Claude Code SDK streaming messages into Agent Session format
+- **Key Methods**: `onMessage()` callback transforms SDKMessage to AgentSessionEntry, tracks session metadata
+- **Implementation**: Add AgentSessionManager to process streaming messages in real-time
 
-### 2. Edge Worker Linear Integration
-- **Location**: `packages/edge-worker/src/EdgeWorker.ts`
-- **Responsibility**: Manages Linear SDK clients, processes webhooks, handles issue assignment/comments, and posts responses to Linear
-- **Key Methods**: `handleIssueAssigned()`, `handleNewComment()`, `postComment()`, `moveIssueToStartedState()`
+### 2. Core Session Management
+- **Location**: `packages/core/src/session/AgentSessionManager.ts` (new)
+- **Responsibility**: Manage Agent Session lifecycle and Linear API integration
+- **Key Methods**: `createSession()`, `addSessionEntry()`, `completeSession()`, `syncToLinear()`
+- **Implementation**: Bridge between Claude Code SDK types and Linear Agent Sessions API
 
 ### 3. Edge Worker Integration
 - **Location**: `packages/edge-worker/src/EdgeWorker.ts`
-- **Responsibility**: Handle distributed agent session management
-- **Key Methods**: `processAgentSession()`, `syncSessionState()`
+- **Responsibility**: Coordinate Agent Session tracking across distributed Claude runners
+- **Key Methods**: `handleClaudeMessage()` enhanced to create Agent Sessions, `initializeAgentSession()` on issue assignment
+- **Implementation**: Ensure each Linear issue gets corresponding Agent Session tracking
 
 ## Benefits of This Mapping
 
@@ -427,13 +430,35 @@ class AgentSessionManager {
 4. **Future-Proof**: Ready for Linear's Agent Sessions API when it becomes available
 5. **Debugging**: Full conversation history aids in troubleshooting agent behavior
 
-## Next Steps
+## Implementation Plan
 
-1. Implement the `AgentSessionManager` class in `packages/core/src/session/`
-2. Update `ClaudeRunner` to use the new mapping
-3. Add Linear API integration for Agent Sessions
-4. Test with existing Cyrus workflows
-5. Add comprehensive logging and monitoring
+### Phase 1: Core Infrastructure
+1. **Create AgentSessionManager** in `packages/core/src/session/AgentSessionManager.ts`
+   - Implement message transformation utilities
+   - Add Linear Agent Sessions API integration
+   - Handle session lifecycle management
+
+2. **Update ClaudeRunner** in `packages/claude-runner/src/ClaudeRunner.ts`
+   - Integrate AgentSessionManager into streaming message processing
+   - Transform each SDKMessage to AgentSessionEntry in real-time
+   - Capture session metadata and cost tracking
+
+### Phase 2: Edge Worker Integration
+3. **Enhance EdgeWorker** in `packages/edge-worker/src/EdgeWorker.ts`
+   - Initialize Agent Sessions when creating Claude runners
+   - Coordinate session tracking across comment threads
+   - Ensure session persistence and state management
+
+### Phase 3: Testing & Validation
+4. **Test with existing Cyrus workflows**
+   - Verify Agent Sessions are created for each issue assignment
+   - Validate message transformation accuracy
+   - Ensure cost and performance tracking works correctly
+
+5. **Add monitoring and logging**
+   - Track Agent Session creation/completion rates
+   - Monitor API usage and performance
+   - Add debugging tools for session analysis
 
 ---
 
