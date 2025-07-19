@@ -7,9 +7,28 @@ All notable changes to this project will be documented in this file.
 ### Added
 - You can now append custom instructions to Claude's system prompt via `appendInstruction` in repository config (~/.cyrus/config.json) - because sometimes Claude needs a gentle reminder that your variable names are art, not accidents
 
+## [0.1.33] - 2025-01-11
+
+### CLI
+- cyrus-ai@0.1.33
+
 ### Fixed
 - Made conversation history of threads be resumable after Cyrus restarts
 - Fixed the issue with continuity of conversation in a thread, after the first comment
+
+### Packages
+
+#### cyrus-core
+- cyrus-core@0.0.6
+
+#### cyrus-claude-runner
+- cyrus-claude-runner@0.0.13
+
+#### cyrus-edge-worker
+- cyrus-edge-worker@0.0.18
+
+#### cyrus-ndjson-client
+- cyrus-ndjson-client@0.0.13
 
 ## [0.1.32] - 2025-01-09
 
