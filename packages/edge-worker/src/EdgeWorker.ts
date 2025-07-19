@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { LinearClient, Issue as LinearIssue, Comment } from '@linear/sdk'
+import { LinearClient, LinearDocument, Issue as LinearIssue, Comment } from '@linear/sdk'
 import { NdjsonClient } from 'cyrus-ndjson-client'
 import { ClaudeRunner, getSafeTools } from 'cyrus-claude-runner'
 import type { McpServerConfig } from 'cyrus-claude-runner'
@@ -15,6 +15,7 @@ import type {
   LinearWebhookComment
 } from 'cyrus-core'
 import { SharedApplicationServer } from './SharedApplicationServer.js'
+import { AgentSessionManager } from './AgentSessionManager.js'
 import {
   isIssueAssignedWebhook,
   isIssueCommentMentionWebhook,
@@ -48,6 +49,7 @@ export class EdgeWorker extends EventEmitter {
   private claudeRunners: Map<string, ClaudeRunner> = new Map() // Maps comment ID to ClaudeRunner
   private commentToRepo: Map<string, string> = new Map() // Maps comment ID to repository ID
   private commentToIssue: Map<string, string> = new Map() // Maps comment ID to issue ID
+  private agentSessionManagers: Map<string, AgentSessionManager> = new Map() // Maps repository ID to AgentSessionManager
   private commentToLatestAgentReply: Map<string, string> = new Map() // Maps thread root comment ID to latest agent comment
   private issueToCommentThreads: Map<string, Set<string>> = new Map() // Maps issue ID to all comment thread IDs
   private tokenToClientId: Map<string, string> = new Map() // Maps token to NDJSON client ID
@@ -76,9 +78,13 @@ export class EdgeWorker extends EventEmitter {
         this.repositories.set(repo.id, repo)
         
         // Create Linear client for this repository's workspace
-        this.linearClients.set(repo.id, new LinearClient({
+        const linearClient = new LinearClient({
           accessToken: repo.linearToken
-        }))
+        })
+        this.linearClients.set(repo.id, linearClient)
+        
+        // Create AgentSessionManager for this repository
+        this.agentSessionManagers.set(repo.id, new AgentSessionManager(linearClient))
       }
     }
 
@@ -502,6 +508,8 @@ export class EdgeWorker extends EventEmitter {
       console.log(`[EdgeWorker] Starting Claude streaming session`)
       const sessionInfo = await runner.startStreaming(prompt)
       console.log(`[EdgeWorker] Claude streaming session started: ${sessionInfo.sessionId}`)
+      // Note: AgentSessionManager will be initialized automatically when the first system message 
+      // is received via handleClaudeMessage() callback
     } catch (error) {
       console.error(`[EdgeWorker] Error in prompt building/starting:`, error)
       throw error
@@ -822,6 +830,8 @@ export class EdgeWorker extends EventEmitter {
             }
           }
           this.handleClaudeMessage(threadRootCommentId, message, repository.id)
+          // Note: AgentSessionManager will automatically link new comments to existing sessions
+          // or create new session entries when Claude streaming messages are handled
         },
         onComplete: (messages) => this.handleClaudeComplete(threadRootCommentId, messages, repository.id),
         onError: (error) => this.handleClaudeError(threadRootCommentId, error, repository.id)
@@ -916,6 +926,17 @@ export class EdgeWorker extends EventEmitter {
       return
     }
     
+    // Get session ID from message if available
+    const sessionId = 'session_id' in message ? message.session_id : undefined
+    
+    // Integrate with AgentSessionManager to capture streaming messages
+    if (sessionId) {
+      const agentSessionManager = this.agentSessionManagers.get(repositoryId)
+      if (agentSessionManager) {
+        await agentSessionManager.handleClaudeMessage(sessionId, message, issueId)
+      }
+    }
+    
     // Emit generic message event
     this.emit('claude:message', issueId, message, repositoryId)
     this.config.handlers?.onClaudeMessage?.(issueId, message, repositoryId)
@@ -969,6 +990,38 @@ export class EdgeWorker extends EventEmitter {
   private async handleClaudeComplete(commentId: string, messages: SDKMessage[], repositoryId: string): Promise<void> {
     const issueId = this.commentToIssue.get(commentId)
     console.log(`[EdgeWorker] Claude session completed for comment thread ${commentId} (issue ${issueId}) with ${messages.length} messages`)
+    
+    // Mark AgentSessionManager sessions as complete if not already handled by result messages
+    const agentSessionManager = this.agentSessionManagers.get(repositoryId)
+    if (agentSessionManager && messages.length > 0) {
+      // Look for any session IDs in the messages to mark them as complete
+      for (const message of messages) {
+        if ('session_id' in message && message.session_id) {
+          const session = agentSessionManager.getSession(message.session_id)
+          if (session && session.status !== LinearDocument.AgentSessionStatus.Complete && session.status !== LinearDocument.AgentSessionStatus.Error) {
+            // Create a synthetic success result message to mark session complete
+            const syntheticResult = {
+              type: 'result' as const,
+              subtype: 'success' as const,
+              session_id: message.session_id,
+              result: 'Session completed successfully',
+              total_cost_usd: 0,
+              usage: {
+                input_tokens: 0,
+                output_tokens: 0
+              },
+              duration_ms: 0,
+              duration_api_ms: 0,
+              num_turns: 0,
+              is_error: false
+            }
+            await agentSessionManager.completeSession(message.session_id, syntheticResult)
+            break // Only complete once per session
+          }
+        }
+      }
+    }
+    
     this.claudeRunners.delete(commentId)
 
     if (issueId) {
@@ -986,6 +1039,34 @@ export class EdgeWorker extends EventEmitter {
     console.error(`[EdgeWorker] Error type: ${error.constructor.name}`)
     if (error.stack) {
       console.error(`[EdgeWorker] Stack trace:`, error.stack)
+    }
+    
+    // Mark AgentSessionManager sessions as error status
+    const agentSessionManager = this.agentSessionManagers.get(repositoryId)
+    if (agentSessionManager) {
+      // Find all active sessions for this issue and mark them as error
+      const activeSessions = agentSessionManager.getActiveSessions()
+      for (const session of activeSessions) {
+        if (session.issueId === issueId) {
+          // Create a synthetic error result message to mark session error
+          const syntheticErrorResult = {
+            type: 'result' as const,
+            subtype: 'error_during_execution' as const,
+            session_id: session.sessionId,
+            result: `Session failed: ${error.message}`,
+            total_cost_usd: 0,
+            usage: {
+              input_tokens: 0,
+              output_tokens: 0
+            },
+            duration_ms: 0,
+            duration_api_ms: 0,
+            num_turns: 0,
+            is_error: true
+          }
+          await agentSessionManager.completeSession(session.sessionId, syntheticErrorResult)
+        }
+      }
     }
     
     // Clean up resources
