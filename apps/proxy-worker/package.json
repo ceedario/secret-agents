@@ -11,7 +11,8 @@
     "tail": "wrangler tail",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "test:run": "echo 'No tests configured for proxy-worker'"
+    "test:run": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "itty-router": "^4.0.23"
