@@ -1,86 +1,109 @@
-import { 
+import {
   LinearClient,
   LinearDocument
 } from '@linear/sdk'
-import type { 
-  SDKMessage, 
-  SDKSystemMessage, 
-  SDKUserMessage, 
-  SDKAssistantMessage, 
-  SDKResultMessage
+import type {
+  SDKMessage,
+  SDKSystemMessage,
+  SDKUserMessage,
+  SDKAssistantMessage,
+  SDKResultMessage,
+  APIAssistantMessage,
+  APIUserMessage,
+  ClaudeRunner
 } from 'cyrus-claude-runner'
-import type { AgentSession, AgentSessionEntry, SerializedAgentSession, SerializedAgentSessionEntry } from 'cyrus-core'
+import type { CyrusAgentSession, CyrusAgentSessionEntry, IssueMinimal, SerializedCyrusAgentSession, SerializedCyrusAgentSessionEntry, Workspace } from 'cyrus-core'
 
 /**
  * Manages Linear Agent Sessions integration with Claude Code SDK
  * Transforms Claude streaming messages into Agent Session format
  * Handles session lifecycle: create → active → complete/error
+ * 
+ * CURRENTLY BEING HANDLED 'per repository'
  */
 export class AgentSessionManager {
   private linearClient: LinearClient
-  private sessions: Map<string, AgentSession> = new Map()
-  private entries: Map<string, AgentSessionEntry[]> = new Map()
+  private sessions: Map<string, CyrusAgentSession> = new Map()
+  private entries: Map<string, CyrusAgentSessionEntry[]> = new Map() // Stores a list of session entries per each session by its linearAgentActivitySessionId
 
   constructor(linearClient: LinearClient) {
     this.linearClient = linearClient
   }
 
   /**
-   * Create a new Agent Session from Claude system initialization
+   * Initialize a Linear agent session from webhook
+   * The session is already created by Linear, we just need to track it
    */
-  async createSession(systemMessage: SDKSystemMessage, issueId: string): Promise<AgentSession> {
-    const agentSession: AgentSession = {
-      id: this.generateId(),
-      type: 'commentThread', // LinearDocument.AgentSessionType.CommentThread
-      status: 'active', // LinearDocument.AgentSessionStatus.Active
-      context: 'commentThread', // LinearDocument.AgentSessionType.CommentThread
+  createLinearAgentSession(linearAgentActivitySessionId: string, issueId: string, issueMinimal: IssueMinimal, workspace: Workspace): CyrusAgentSession {
+    console.log(`[AgentSessionManager] Tracking Linear session ${linearAgentActivitySessionId} for issue ${issueId}`)
+
+    const agentSession: CyrusAgentSession = {
+      linearAgentActivitySessionId,
+      type: LinearDocument.AgentSessionType.CommentThread,
+      status: LinearDocument.AgentSessionStatus.Active,
+      context: LinearDocument.AgentSessionType.CommentThread,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
       issueId,
-      sessionId: systemMessage.session_id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      metadata: {
-        model: systemMessage.model,
-        tools: systemMessage.tools,
-        permissionMode: systemMessage.permissionMode,
-        apiKeySource: systemMessage.apiKeySource
-      }
+      issue: issueMinimal,
+      workspace: workspace
     }
 
     // Store locally
-    this.sessions.set(systemMessage.session_id, agentSession)
-    this.entries.set(systemMessage.session_id, [])
-
-    // Sync to Linear (create AgentContext)
-    await this.syncSessionToLinear(agentSession)
+    this.sessions.set(linearAgentActivitySessionId, agentSession)
+    this.entries.set(linearAgentActivitySessionId, [])
 
     return agentSession
   }
 
   /**
+   * Create a new Agent Session from Claude system initialization
+   */
+  updateAgentSessionWithClaudeSessionId(linearAgentActivitySessionId: string, claudeSystemMessage: SDKSystemMessage): void {
+    const linearSession = this.sessions.get(linearAgentActivitySessionId)
+    if (!linearSession) {
+      console.warn(`[AgentSessionManager] No Linear session found for linearAgentActivitySessionId ${linearAgentActivitySessionId}`)
+      return
+    }
+    linearSession.claudeSessionId = claudeSystemMessage.session_id
+    linearSession.updatedAt = Date.now()
+    linearSession.metadata = {
+      model: claudeSystemMessage.model,
+      tools: claudeSystemMessage.tools,
+      permissionMode: claudeSystemMessage.permissionMode,
+      apiKeySource: claudeSystemMessage.apiKeySource,
+    }
+  }
+
+  /**
    * Add a session entry from Claude user/assistant message
    */
-  async addSessionEntry(sessionId: string, sdkMessage: SDKUserMessage | SDKAssistantMessage): Promise<AgentSessionEntry> {
-    const sessionEntry: AgentSessionEntry = {
-      id: this.generateId(),
-      sessionId,
+  async addSessionEntry(linearAgentActivitySessionId: string, sdkMessage: SDKUserMessage | SDKAssistantMessage): Promise<CyrusAgentSessionEntry> {
+    // Extract tool info if this is an assistant message
+    const toolInfo = sdkMessage.type === 'assistant' ? this.extractToolInfo(sdkMessage) : null
+
+    const sessionEntry: CyrusAgentSessionEntry = {
+      claudeSessionId: sdkMessage.session_id,
       type: sdkMessage.type,
       content: this.extractContent(sdkMessage),
       metadata: {
-        timestamp: new Date(),
+        timestamp: Date.now(),
         parentToolUseId: sdkMessage.parent_tool_use_id || undefined,
-        ...(sdkMessage.type === 'assistant' && {
-          toolUseId: this.extractToolUseId(sdkMessage)
+        ...(toolInfo && {
+          toolUseId: toolInfo.id,
+          toolName: toolInfo.name,
+          toolInput: toolInfo.input
         })
       }
     }
 
     // Store locally
-    const entries = this.entries.get(sessionId) || []
+    const entries = this.entries.get(linearAgentActivitySessionId) || []
     entries.push(sessionEntry)
-    this.entries.set(sessionId, entries)
+    this.entries.set(linearAgentActivitySessionId, entries)
 
     // Create AgentActivity in Linear
-    await this.syncEntryToLinear(sessionEntry)
+    await this.syncEntryToLinear(sessionEntry, linearAgentActivitySessionId)
 
     return sessionEntry
   }
@@ -88,48 +111,48 @@ export class AgentSessionManager {
   /**
    * Complete a session from Claude result message
    */
-  async completeSession(sessionId: string, resultMessage: SDKResultMessage): Promise<void> {
-    const session = this.sessions.get(sessionId)
+  async completeSession(linearAgentActivitySessionId: string, resultMessage: SDKResultMessage): Promise<void> {
+    const session = this.sessions.get(linearAgentActivitySessionId)
     if (!session) {
-      console.error(`[AgentSessionManager] No session found for ID: ${sessionId}`)
+      console.error(`[AgentSessionManager] No session found for linearAgentActivitySessionId: ${linearAgentActivitySessionId}`)
       return
     }
 
-    const status = resultMessage.subtype === 'success' 
-      ? 'complete' // LinearDocument.AgentSessionStatus.Complete 
-      : 'error' // LinearDocument.AgentSessionStatus.Error
+    const status = resultMessage.subtype === 'success'
+      ? LinearDocument.AgentSessionStatus.Complete
+      : LinearDocument.AgentSessionStatus.Error
 
     // Update session status and metadata
-    await this.updateSessionStatus(sessionId, status, {
+    await this.updateSessionStatus(linearAgentActivitySessionId, status, {
       totalCostUsd: resultMessage.total_cost_usd,
       usage: resultMessage.usage
     })
 
     // Add result entry if present
     if ('result' in resultMessage && resultMessage.result) {
-      await this.addResultEntry(sessionId, resultMessage)
+      await this.addResultEntry(linearAgentActivitySessionId, resultMessage)
     }
   }
 
   /**
    * Handle streaming Claude messages and route to appropriate methods
    */
-  async handleClaudeMessage(sessionId: string, message: SDKMessage, issueId: string): Promise<void> {
+  async handleClaudeMessage(linearAgentActivitySessionId: string, message: SDKMessage): Promise<void> {
     try {
       switch (message.type) {
         case 'system':
           if (message.subtype === 'init') {
-            await this.createSession(message as SDKSystemMessage, issueId)
+            this.updateAgentSessionWithClaudeSessionId(linearAgentActivitySessionId, message)
           }
           break
 
         case 'user':
         case 'assistant':
-          await this.addSessionEntry(sessionId, message as SDKUserMessage | SDKAssistantMessage)
+          await this.addSessionEntry(linearAgentActivitySessionId, message as SDKUserMessage | SDKAssistantMessage)
           break
 
         case 'result':
-          await this.completeSession(sessionId, message as SDKResultMessage)
+          await this.completeSession(linearAgentActivitySessionId, message as SDKResultMessage)
           break
 
         default:
@@ -138,7 +161,7 @@ export class AgentSessionManager {
     } catch (error) {
       console.error(`[AgentSessionManager] Error handling message:`, error)
       // Mark session as error state
-      await this.updateSessionStatus(sessionId, 'error') // LinearDocument.AgentSessionStatus.Error
+      await this.updateSessionStatus(linearAgentActivitySessionId, LinearDocument.AgentSessionStatus.Error)
     }
   }
 
@@ -146,170 +169,182 @@ export class AgentSessionManager {
    * Update session status and metadata
    */
   private async updateSessionStatus(
-    sessionId: string, 
-    status: string, // AgentSessionStatus 
-    additionalMetadata?: Partial<AgentSession['metadata']>
+    linearAgentActivitySessionId: string,
+    status: LinearDocument.AgentSessionStatus,
+    additionalMetadata?: Partial<CyrusAgentSession['metadata']>
   ): Promise<void> {
-    const session = this.sessions.get(sessionId)
+    const session = this.sessions.get(linearAgentActivitySessionId)
     if (!session) return
 
     session.status = status
-    session.updatedAt = new Date()
-    
+    session.updatedAt = Date.now()
+
     if (additionalMetadata) {
       session.metadata = { ...session.metadata, ...additionalMetadata }
     }
 
-    this.sessions.set(sessionId, session)
-
-    // Sync status update to Linear
-    await this.syncSessionToLinear(session)
+    this.sessions.set(linearAgentActivitySessionId, session)
   }
 
   /**
    * Add result entry from Claude result message
    */
-  private async addResultEntry(sessionId: string, resultMessage: SDKResultMessage): Promise<void> {
-    const resultEntry: AgentSessionEntry = {
-      id: this.generateId(),
-      sessionId,
+  private async addResultEntry(linearAgentActivitySessionId: string, resultMessage: SDKResultMessage): Promise<void> {
+    const resultEntry: CyrusAgentSessionEntry = {
+      claudeSessionId: resultMessage.session_id,
       type: 'result',
       content: 'result' in resultMessage ? resultMessage.result : '',
       metadata: {
-        timestamp: new Date(),
+        timestamp: Date.now(),
         durationMs: resultMessage.duration_ms,
         isError: resultMessage.is_error
-      }
+      },
     }
 
     // Store locally
-    const entries = this.entries.get(sessionId) || []
+    const entries = this.entries.get(linearAgentActivitySessionId) || []
     entries.push(resultEntry)
-    this.entries.set(sessionId, entries)
+    this.entries.set(linearAgentActivitySessionId, entries)
 
     // Sync to Linear
-    await this.syncEntryToLinear(resultEntry)
+    await this.syncEntryToLinear(resultEntry, linearAgentActivitySessionId)
   }
 
   /**
    * Extract content from Claude message
    */
   private extractContent(sdkMessage: SDKUserMessage | SDKAssistantMessage): string {
-    const message = sdkMessage.message
-    
+    const message = sdkMessage.type === 'user'
+      ? sdkMessage.message as APIUserMessage
+      : sdkMessage.message as APIAssistantMessage
+
     if (typeof message.content === 'string') {
       return message.content
     }
-    
+
     if (Array.isArray(message.content)) {
       return message.content
-        .map((block: any) => {
+        .map((block) => {
           if (block.type === 'text') {
             return block.text
           } else if (block.type === 'tool_use') {
-            return `[Tool Use: ${block.name}]`
+            // For tool use blocks, return the input as JSON string
+            return JSON.stringify(block.input, null, 2)
           }
           return ''
         })
         .filter(Boolean)
         .join('\n')
     }
-    
+
     return ''
   }
 
+
   /**
-   * Extract tool use ID from Claude assistant message
+   * Extract tool information from Claude assistant message
    */
-  private extractToolUseId(sdkMessage: SDKAssistantMessage): string | undefined {
-    const message = sdkMessage.message
-    
+  private extractToolInfo(sdkMessage: SDKAssistantMessage): { id: string; name: string; input: any } | null {
+    const message = sdkMessage.message as APIAssistantMessage
+
     if (Array.isArray(message.content)) {
-      const toolUse = message.content.find((block: any) => block.type === 'tool_use')
-      return toolUse?.id
+      const toolUse = message.content.find((block) => block.type === 'tool_use')
+      if (toolUse && 'id' in toolUse && 'name' in toolUse && 'input' in toolUse) {
+        return {
+          id: toolUse.id,
+          name: toolUse.name,
+          input: toolUse.input
+        }
+      }
     }
-    return undefined
+    return null
   }
 
-  /**
-   * Sync Agent Session to Linear (create/update AgentContext)
-   */
-  private async syncSessionToLinear(session: AgentSession): Promise<void> {
-    try {
-      // Note: Linear AgentContextCreateInput requires commentId, creatorId, sourceUrl
-      // For now, we'll create a placeholder approach since we don't have these values
-      const contextInput: LinearDocument.AgentContextCreateInput = {
-        commentId: session.issueId, // Using issueId as placeholder
-        creatorId: 'system', // Placeholder - should be actual user ID
-        sourceUrl: `https://linear.app/issue/${session.issueId}`, // Placeholder URL
-        type: LinearDocument.AgentSessionType.CommentThread // Use actual enum value for API
-      }
-
-      // Create AgentContext in Linear
-      const result = await this.linearClient.createAgentContext(contextInput)
-      
-      if (result.success && result.agentContext) {
-        const agentContext = await result.agentContext; session.linearContextId = agentContext.id
-        console.log(`[AgentSessionManager] Synced session ${session.sessionId} to Linear context ${session.linearContextId}`)
-      } else {
-        console.error(`[AgentSessionManager] Failed to create Linear context: success=${result.success}`)
-      }
-    } catch (error) {
-      console.error(`[AgentSessionManager] Failed to sync session to Linear:`, error)
-    }
-  }
 
   /**
    * Sync Agent Session Entry to Linear (create AgentActivity)
    */
-  private async syncEntryToLinear(entry: AgentSessionEntry): Promise<void> {
+  private async syncEntryToLinear(entry: CyrusAgentSessionEntry, linearAgentActivitySessionId: string): Promise<void> {
     try {
-      const session = this.sessions.get(entry.sessionId)
-      if (!session || !session.linearContextId) {
-        console.warn(`[AgentSessionManager] No Linear context ID for session ${entry.sessionId}`)
+      const session = this.sessions.get(linearAgentActivitySessionId)
+      if (!session) {
+        console.warn(`[AgentSessionManager] No Linear session for linearAgentActivitySessionId ${linearAgentActivitySessionId}`)
         return
       }
 
-      // Determine activity type based on entry type
-      let activityType: LinearDocument.AgentActivityType
+      // Build activity content based on entry type
+      let content: any
       switch (entry.type) {
         case 'user':
-          activityType = LinearDocument.AgentActivityType.Prompt
-          break
+          // User messages are prompts - but we don't create these, Linear does
+          console.log(`[AgentSessionManager] Skipping user entry - prompts are created by Linear`)
+          return
+
         case 'assistant':
-          activityType = LinearDocument.AgentActivityType.Response
+          // Assistant messages can be thoughts or responses
+          if (entry.metadata?.toolUseId) {
+            // Tool use - create an action activity
+            const toolName = entry.metadata.toolName || 'Tool'
+
+            content = {
+              type: 'action',
+              action: toolName,
+              parameter: entry.content, // This is now just the JSON input
+              // result will be added later when we get tool result
+            }
+          } else {
+            // Regular assistant message - create a thought
+            content = {
+              type: 'thought',
+              body: entry.content
+            }
+          }
           break
+
         case 'system':
-          activityType = LinearDocument.AgentActivityType.Thought
+          // System messages are thoughts
+          content = {
+            type: 'thought',
+            body: entry.content
+          }
           break
+
         case 'result':
-          activityType = entry.metadata?.isError ? LinearDocument.AgentActivityType.Error : LinearDocument.AgentActivityType.Action
+          // Result messages can be responses or errors
+          if (entry.metadata?.isError) {
+            content = {
+              type: 'error',
+              body: entry.content
+            }
+          } else {
+            content = {
+              type: 'response',
+              body: entry.content
+            }
+          }
           break
+
         default:
-          activityType = LinearDocument.AgentActivityType.Thought
+          // Default to thought
+          content = {
+            type: 'thought',
+            body: entry.content
+          }
       }
 
-      const activityInput: LinearDocument.AgentActivityCreateInput = {
-        agentSessionId: session.linearContextId || session.sessionId, // Use Linear context ID or fallback
-        content: {
-          type: activityType,
-          entryType: entry.type,
-          content: entry.content,
-          toolUseId: entry.metadata?.toolUseId,
-          parentToolUseId: entry.metadata?.parentToolUseId,
-          timestamp: entry.metadata?.timestamp?.toISOString(),
-          durationMs: entry.metadata?.durationMs,
-          isError: entry.metadata?.isError
-        }
+      const activityInput = {
+        agentSessionId: session.linearAgentActivitySessionId, // Use the Linear session ID
+        content
       }
 
       const result = await this.linearClient.createAgentActivity(activityInput)
-      
+
       if (result.success && result.agentActivity) {
-        const agentActivity = await result.agentActivity; entry.linearActivityId = agentActivity.id
-        console.log(`[AgentSessionManager] Synced entry ${entry.id} to Linear activity ${entry.linearActivityId}`)
+        const agentActivity = await result.agentActivity
+        entry.linearAgentActivityId = agentActivity.id
+        console.log(`[AgentSessionManager] Created ${content.type} activity ${entry.linearAgentActivityId}`)
       } else {
-        console.error(`[AgentSessionManager] Failed to create Linear activity: success=${result.success}`)
+        console.error(`[AgentSessionManager] Failed to create Linear activity:`, result)
       }
     } catch (error) {
       console.error(`[AgentSessionManager] Failed to sync entry to Linear:`, error)
@@ -317,39 +352,66 @@ export class AgentSessionManager {
   }
 
   /**
-   * Generate unique ID
-   */
-  private generateId(): string {
-    return `asm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  }
-
-  /**
    * Get session by ID
    */
-  getSession(sessionId: string): AgentSession | undefined {
-    return this.sessions.get(sessionId)
+  getSession(linearAgentActivitySessionId: string): CyrusAgentSession | undefined {
+    return this.sessions.get(linearAgentActivitySessionId)
   }
 
   /**
    * Get session entries by session ID
    */
-  getSessionEntries(sessionId: string): AgentSessionEntry[] {
-    return this.entries.get(sessionId) || []
+  getSessionEntries(linearAgentActivitySessionId: string): CyrusAgentSessionEntry[] {
+    return this.entries.get(linearAgentActivitySessionId) || []
   }
 
   /**
    * Get all active sessions
    */
-  getActiveSessions(): AgentSession[] {
+  getActiveSessions(): CyrusAgentSession[] {
     return Array.from(this.sessions.values()).filter(
-      session => session.status === 'active' // LinearDocument.AgentSessionStatus.Active
+      session => session.status === LinearDocument.AgentSessionStatus.Active
     )
+  }
+
+  /**
+   * Add or update ClaudeRunner for a session
+   */
+  addClaudeRunner(linearAgentActivitySessionId: string, claudeRunner: ClaudeRunner): void {
+    const session = this.sessions.get(linearAgentActivitySessionId)
+    if (!session) {
+      console.warn(`[AgentSessionManager] No session found for linearAgentActivitySessionId ${linearAgentActivitySessionId}`)
+      return
+    }
+    
+    session.claudeRunner = claudeRunner
+    session.updatedAt = Date.now()
+    console.log(`[AgentSessionManager] Added ClaudeRunner to session ${linearAgentActivitySessionId}`)
+  }
+
+  /**
+   *  Get all ClaudeRunners
+   */
+  getAllClaudeRunners(): ClaudeRunner[] {
+    return Array.from(this.sessions.values())
+      .map(session => session.claudeRunner)
+      .filter((runner): runner is ClaudeRunner => runner !== undefined)
+  }
+
+  /**
+   * Get all ClaudeRunners for a specific issue
+   */
+  getClaudeRunnersForIssue(issueId: string): ClaudeRunner[] {
+    return Array.from(this.sessions.values())
+      .filter(session => session.issueId === issueId)
+      .map(session => session.claudeRunner)
+      .filter((runner): runner is ClaudeRunner => runner !== undefined)
   }
 
   /**
    * Get sessions by issue ID
    */
-  getSessionsByIssueId(issueId: string): AgentSession[] {
+  getSessionsByIssueId(issueId: string): CyrusAgentSession[] {
     return Array.from(this.sessions.values()).filter(
       session => session.issueId === issueId
     )
@@ -358,25 +420,177 @@ export class AgentSessionManager {
   /**
    * Get active sessions by issue ID
    */
-  getActiveSessionsByIssueId(issueId: string): AgentSession[] {
+  getActiveSessionsByIssueId(issueId: string): CyrusAgentSession[] {
     return Array.from(this.sessions.values()).filter(
-      session => session.issueId === issueId && session.status === 'active' // LinearDocument.AgentSessionStatus.Active
+      session => session.issueId === issueId && session.status === LinearDocument.AgentSessionStatus.Active
     )
   }
 
   /**
    * Get all sessions
    */
-  getAllSessions(): AgentSession[] {
+  getAllSessions(): CyrusAgentSession[] {
     return Array.from(this.sessions.values())
+  }
+
+  /**
+   * Create a thought activity
+   */
+  async createThoughtActivity(sessionId: string, body: string): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session || !session.linearAgentActivitySessionId) {
+      console.warn(`[AgentSessionManager] No Linear session ID for session ${sessionId}`)
+      return
+    }
+
+    try {
+      const result = await this.linearClient.createAgentActivity({
+        agentSessionId: session.linearAgentActivitySessionId,
+        content: {
+          type: 'thought',
+          body
+        }
+      })
+
+      if (result.success) {
+        console.log(`[AgentSessionManager] Created thought activity for session ${sessionId}`)
+      } else {
+        console.error(`[AgentSessionManager] Failed to create thought activity:`, result)
+      }
+    } catch (error) {
+      console.error(`[AgentSessionManager] Error creating thought activity:`, error)
+    }
+  }
+
+  /**
+   * Create an action activity
+   */
+  async createActionActivity(sessionId: string, action: string, parameter: string, result?: string): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session || !session.linearAgentActivitySessionId) {
+      console.warn(`[AgentSessionManager] No Linear session ID for session ${sessionId}`)
+      return
+    }
+
+    try {
+      const content: any = {
+        type: 'action',
+        action,
+        parameter
+      }
+
+      if (result !== undefined) {
+        content.result = result
+      }
+
+      const response = await this.linearClient.createAgentActivity({
+        agentSessionId: session.linearAgentActivitySessionId,
+        content
+      })
+
+      if (response.success) {
+        console.log(`[AgentSessionManager] Created action activity for session ${sessionId}`)
+      } else {
+        console.error(`[AgentSessionManager] Failed to create action activity:`, response)
+      }
+    } catch (error) {
+      console.error(`[AgentSessionManager] Error creating action activity:`, error)
+    }
+  }
+
+  /**
+   * Create a response activity
+   */
+  async createResponseActivity(sessionId: string, body: string): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session || !session.linearAgentActivitySessionId) {
+      console.warn(`[AgentSessionManager] No Linear session ID for session ${sessionId}`)
+      return
+    }
+
+    try {
+      const result = await this.linearClient.createAgentActivity({
+        agentSessionId: session.linearAgentActivitySessionId,
+        content: {
+          type: 'response',
+          body
+        }
+      })
+
+      if (result.success) {
+        console.log(`[AgentSessionManager] Created response activity for session ${sessionId}`)
+      } else {
+        console.error(`[AgentSessionManager] Failed to create response activity:`, result)
+      }
+    } catch (error) {
+      console.error(`[AgentSessionManager] Error creating response activity:`, error)
+    }
+  }
+
+  /**
+   * Create an error activity
+   */
+  async createErrorActivity(sessionId: string, body: string): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session || !session.linearAgentActivitySessionId) {
+      console.warn(`[AgentSessionManager] No Linear session ID for session ${sessionId}`)
+      return
+    }
+
+    try {
+      const result = await this.linearClient.createAgentActivity({
+        agentSessionId: session.linearAgentActivitySessionId,
+        content: {
+          type: 'error',
+          body
+        }
+      })
+
+      if (result.success) {
+        console.log(`[AgentSessionManager] Created error activity for session ${sessionId}`)
+      } else {
+        console.error(`[AgentSessionManager] Failed to create error activity:`, result)
+      }
+    } catch (error) {
+      console.error(`[AgentSessionManager] Error creating error activity:`, error)
+    }
+  }
+
+  /**
+   * Create an elicitation activity
+   */
+  async createElicitationActivity(sessionId: string, body: string): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session || !session.linearAgentActivitySessionId) {
+      console.warn(`[AgentSessionManager] No Linear session ID for session ${sessionId}`)
+      return
+    }
+
+    try {
+      const result = await this.linearClient.createAgentActivity({
+        agentSessionId: session.linearAgentActivitySessionId,
+        content: {
+          type: 'elicitation',
+          body
+        }
+      })
+
+      if (result.success) {
+        console.log(`[AgentSessionManager] Created elicitation activity for session ${sessionId}`)
+      } else {
+        console.error(`[AgentSessionManager] Failed to create elicitation activity:`, result)
+      }
+    } catch (error) {
+      console.error(`[AgentSessionManager] Error creating elicitation activity:`, error)
+    }
   }
 
   /**
    * Clear completed sessions older than specified time
    */
   cleanup(olderThanMs: number = 24 * 60 * 60 * 1000): void {
-    const cutoff = new Date(Date.now() - olderThanMs)
-    
+    const cutoff = Date.now() - olderThanMs
+
     for (const [sessionId, session] of this.sessions.entries()) {
       if (
         (session.status === 'complete' || session.status === 'error') &&
@@ -392,27 +606,21 @@ export class AgentSessionManager {
   /**
    * Serialize Agent Session state for persistence
    */
-  serializeState(): { sessions: Record<string, SerializedAgentSession>, entries: Record<string, SerializedAgentSessionEntry[]> } {
-    const sessions: Record<string, SerializedAgentSession> = {}
-    const entries: Record<string, SerializedAgentSessionEntry[]> = {}
+  serializeState(): { sessions: Record<string, SerializedCyrusAgentSession>, entries: Record<string, SerializedCyrusAgentSessionEntry[]> } {
+    const sessions: Record<string, SerializedCyrusAgentSession> = {}
+    const entries: Record<string, SerializedCyrusAgentSessionEntry[]> = {}
 
     // Serialize sessions
     for (const [sessionId, session] of this.sessions.entries()) {
-      sessions[sessionId] = {
-        ...session,
-        createdAt: session.createdAt.toISOString(),
-        updatedAt: session.updatedAt.toISOString()
-      }
+      // Exclude claudeRunner from serialization as it's not serializable
+      const { claudeRunner, ...serializableSession } = session
+      sessions[sessionId] = serializableSession
     }
 
     // Serialize entries
     for (const [sessionId, sessionEntries] of this.entries.entries()) {
       entries[sessionId] = sessionEntries.map(entry => ({
         ...entry,
-        metadata: {
-          ...entry.metadata,
-          timestamp: entry.metadata?.timestamp?.toISOString()
-        }
       }))
     }
 
@@ -422,33 +630,27 @@ export class AgentSessionManager {
   /**
    * Restore Agent Session state from serialized data
    */
-  restoreState(serializedSessions: Record<string, SerializedAgentSession>, serializedEntries: Record<string, SerializedAgentSessionEntry[]>): void {
+  restoreState(serializedSessions: Record<string, SerializedCyrusAgentSession>, serializedEntries: Record<string, SerializedCyrusAgentSessionEntry[]>): void {
     // Clear existing state
     this.sessions.clear()
     this.entries.clear()
 
     // Restore sessions
     for (const [sessionId, sessionData] of Object.entries(serializedSessions)) {
-      const session: AgentSession = {
+      const session: CyrusAgentSession = {
         ...sessionData,
-        createdAt: new Date(sessionData.createdAt),
-        updatedAt: new Date(sessionData.updatedAt)
       }
       this.sessions.set(sessionId, session)
     }
 
     // Restore entries
     for (const [sessionId, entriesData] of Object.entries(serializedEntries)) {
-      const sessionEntries: AgentSessionEntry[] = entriesData.map(entryData => ({
+      const sessionEntries: CyrusAgentSessionEntry[] = entriesData.map(entryData => ({
         ...entryData,
-        metadata: {
-          ...entryData.metadata,
-          timestamp: entryData.metadata?.timestamp ? new Date(entryData.metadata.timestamp) : new Date()
-        }
       }))
       this.entries.set(sessionId, sessionEntries)
     }
 
-    console.log(`[AgentSessionManager] Restored ${this.sessions.size} sessions and ${Object.keys(serializedEntries).length} entry collections`)
+    console.log(`[AgentSessionManager] Restored ${this.sessions.size} sessions, ${Object.keys(serializedEntries).length} entry collections`)
   }
 }

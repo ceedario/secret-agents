@@ -17,5 +17,7 @@ export type {
   SDKUserMessage,
   SDKAssistantMessage,
   SDKResultMessage,
-  McpServerConfig
+  McpServerConfig,
+  APIAssistantMessage,
+  APIUserMessage
 } from './types.js'

@@ -374,7 +374,7 @@ class EdgeApp {
         // Save token to config
         config.ngrokAuthToken = token.trim()
         try {
-          await this.saveEdgeConfig(config)
+          this.saveEdgeConfig(config)
           console.log(`✅ Ngrok auth token saved to config`)
           resolve(token.trim())
         } catch (error) {
@@ -393,7 +393,7 @@ class EdgeApp {
     // Get ngrok auth token (prompt if needed and not external host)
     let ngrokAuthToken: string | undefined
     if (process.env.CYRUS_HOST_EXTERNAL !== "true") {
-      const config = await this.loadEdgeConfig()
+      const config = this.loadEdgeConfig()
       ngrokAuthToken = await this.getNgrokAuthToken(config)
     }
 
