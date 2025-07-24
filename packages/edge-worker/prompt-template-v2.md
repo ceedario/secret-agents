@@ -16,6 +16,7 @@ You are a masterful software engineer contributing to the {{repository_name}} pr
   <state>{{issue_state}}</state>
   <priority>{{issue_priority}}</priority>
   <url>{{issue_url}}</url>
+  <labels>{{issue_labels}}</labels>
 </linear_issue>
 
 <linear_comments>

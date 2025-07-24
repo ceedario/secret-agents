@@ -433,7 +433,11 @@ export class EdgeWorker extends EventEmitter {
     // Build allowed tools list with Linear MCP tools
     const allowedTools = this.buildAllowedTools(repository)
 
-    // Create Claude runner with attachment directory access
+    // Fetch issue labels and determine system prompt
+    const labels = await this.fetchIssueLabels(fullIssue)
+    const systemPrompt = await this.determineSystemPromptFromLabels(labels, repository)
+
+    // Create Claude runner with attachment directory access and optional system prompt
     const runner = new ClaudeRunner({
       workingDirectory: workspace.path,
       allowedTools,
@@ -441,6 +445,7 @@ export class EdgeWorker extends EventEmitter {
       workspaceName: fullIssue.identifier,
       mcpConfigPath: repository.mcpConfigPath,
       mcpConfig: this.buildMcpConfig(repository),
+      ...(systemPrompt && { appendSystemPrompt: systemPrompt }),
       onMessage: (message) => this.handleClaudeMessage(message, repository.id),
       // onComplete: (messages) => this.handleClaudeComplete(initialComment.id, messages, repository.id),
       onError: (error) => this.handleClaudeError(error)
@@ -459,8 +464,8 @@ export class EdgeWorker extends EventEmitter {
     // Build and start Claude with initial prompt using full issue (streaming mode)
     console.log(`[EdgeWorker] Building initial prompt for issue ${fullIssue.identifier}`)
     try {
-      // Use buildPromptV2 without a new comment for issue assignment
-      const prompt = await this.buildPromptV2(fullIssue, repository, undefined, attachmentResult.manifest)
+      // Use buildPromptV2 with labels and system prompt info for workflow determination
+      const prompt = await this.buildPromptV2(fullIssue, repository, undefined, attachmentResult.manifest, labels, !!systemPrompt)
       console.log(`[EdgeWorker] Initial prompt built successfully, length: ${prompt.length} characters`)
       console.log(`[EdgeWorker] Starting Claude streaming session`)
       const sessionInfo = await runner.startStreaming(prompt)
@@ -654,6 +659,51 @@ export class EdgeWorker extends EventEmitter {
   }
 
   /**
+   * Fetch issue labels for a given issue
+   */
+  private async fetchIssueLabels(issue: LinearIssue): Promise<string[]> {
+    try {
+      const labels = await issue.labels()
+      return labels.nodes.map(label => label.name)
+    } catch (error) {
+      console.error(`[EdgeWorker] Failed to fetch labels for issue ${issue.id}:`, error)
+      return []
+    }
+  }
+
+  /**
+   * Determine system prompt based on issue labels and repository configuration
+   */
+  private async determineSystemPromptFromLabels(labels: string[], repository: RepositoryConfig): Promise<string | undefined> {
+    if (!repository.labelPrompts || labels.length === 0) {
+      return undefined
+    }
+
+    // Check each prompt type for matching labels
+    const promptTypes = ['debugger', 'builder', 'scoper'] as const
+    
+    for (const promptType of promptTypes) {
+      const configuredLabels = repository.labelPrompts[promptType]
+      if (configuredLabels && configuredLabels.some(label => labels.includes(label))) {
+        try {
+          // Load the prompt template from file
+          const __filename = fileURLToPath(import.meta.url)
+          const __dirname = dirname(__filename)
+          const promptPath = join(__dirname, '..', 'prompts', `${promptType}.md`)
+          const promptContent = await readFile(promptPath, 'utf-8')
+          console.log(`[EdgeWorker] Using ${promptType} system prompt for labels: ${labels.join(', ')}`)
+          return promptContent
+        } catch (error) {
+          console.error(`[EdgeWorker] Failed to load ${promptType} prompt template:`, error)
+          return undefined
+        }
+      }
+    }
+
+    return undefined
+  }
+
+  /**
    * Convert full Linear SDK issue to CoreIssue interface for Session creation
    */
   private convertLinearIssueToCore(issue: LinearIssue): IssueMinimal {
@@ -764,13 +814,17 @@ ${reply.body}
    * @param repository Repository configuration  
    * @param newComment Optional new comment to focus on (for handleNewRootComment)
    * @param attachmentManifest Optional attachment manifest
+   * @param labels Issue labels for workflow determination
+   * @param hasSystemPrompt Whether a system prompt was applied based on labels
    * @returns Formatted prompt string
    */
   private async buildPromptV2(
     issue: LinearIssue,
     repository: RepositoryConfig,
     newComment?: LinearWebhookComment,
-    attachmentManifest: string = ''
+    attachmentManifest: string = '',
+    labels: string[] = [],
+    hasSystemPrompt: boolean = false
   ): Promise<string> {
     console.log(`[EdgeWorker] buildPromptV2 called for issue ${issue.identifier}${newComment ? ' with new comment' : ''}`)
 
@@ -794,11 +848,12 @@ ${reply.body}
       const state = await issue.state
       const stateName = state?.name || 'Unknown'
 
-      // Get formatted comment threads
+      // Get formatted comment threads (only for fallback workflow)
       const linearClient = this.linearClients.get(repository.id)
       let commentThreads = 'No comments yet.'
 
-      if (linearClient && issue.id) {
+      // For label-based workflows, skip comment fetching to simplify the message
+      if (!hasSystemPrompt && linearClient && issue.id) {
         try {
           console.log(`[EdgeWorker] Fetching comments for issue ${issue.identifier}`)
           const comments = await linearClient.comments({
@@ -813,6 +868,10 @@ ${reply.body}
         } catch (error) {
           console.error('Failed to fetch comments:', error)
         }
+      } else if (hasSystemPrompt) {
+        // For label-based workflows, indicate that comments are excluded
+        commentThreads = '(Comments excluded for focused issue processing)'
+        console.log(`[EdgeWorker] Using label-based workflow, skipping comment threads`)
       }
 
       // Build the prompt with all variables
@@ -825,6 +884,7 @@ ${reply.body}
         .replace(/{{issue_state}}/g, stateName)
         .replace(/{{issue_priority}}/g, issue.priority?.toString() || 'None')
         .replace(/{{issue_url}}/g, issue.url || '')
+        .replace(/{{issue_labels}}/g, labels.join(', ') || 'None')
         .replace(/{{comment_threads}}/g, commentThreads)
         .replace(/{{working_directory}}/g, this.config.handlers?.createWorkspace ?
           'Will be created based on issue' : repository.repositoryPath)
