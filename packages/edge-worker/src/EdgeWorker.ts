@@ -730,7 +730,7 @@ export class EdgeWorker extends EventEmitter {
       console.log(`[EdgeWorker] Template loaded, length: ${template.length} characters`)
 
       // Build the simplified prompt with only essential variables
-      const prompt = template
+      let prompt = template
         .replace(/{{repository_name}}/g, repository.name)
         .replace(/{{base_branch}}/g, repository.baseBranch)
         .replace(/{{issue_id}}/g, issue.id || '')
@@ -739,10 +739,10 @@ export class EdgeWorker extends EventEmitter {
         .replace(/{{issue_description}}/g, issue.description || 'No description provided')
         .replace(/{{issue_url}}/g, issue.url || '')
 
-    if (attachmentManifest) {
-      console.log(`[EdgeWorker] Adding attachment manifest to label-based prompt, length: ${attachmentManifest.length} characters`)
-      prompt = prompt + '\n\n' + attachmentManifest
-    }
+      if (attachmentManifest) {
+        console.log(`[EdgeWorker] Adding attachment manifest to label-based prompt, length: ${attachmentManifest.length} characters`)
+        prompt = prompt + '\n\n' + attachmentManifest
+      }
 
       console.log(`[EdgeWorker] Label-based prompt built successfully, length: ${prompt.length} characters`)
       return prompt
