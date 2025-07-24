@@ -466,7 +466,7 @@ export class EdgeWorker extends EventEmitter {
     try {
       // Choose the appropriate prompt builder based on system prompt availability
       const prompt = systemPrompt
-        ? await this.buildLabelBasedPrompt(fullIssue, repository)
+        ? await this.buildLabelBasedPrompt(fullIssue, repository, attachmentResult.manifest)
         : await this.buildPromptV2(fullIssue, repository, undefined, attachmentResult.manifest)
       
       console.log(`[EdgeWorker] Initial prompt built successfully using ${systemPrompt ? 'label-based' : 'fallback'} workflow, length: ${prompt.length} characters`)
@@ -714,7 +714,8 @@ export class EdgeWorker extends EventEmitter {
    */
   private async buildLabelBasedPrompt(
     issue: LinearIssue,
-    repository: RepositoryConfig
+    repository: RepositoryConfig,
+    attachmentManifest: string = ''
   ): Promise<string> {
     console.log(`[EdgeWorker] buildLabelBasedPrompt called for issue ${issue.identifier}`)
 
@@ -737,6 +738,11 @@ export class EdgeWorker extends EventEmitter {
         .replace(/{{issue_title}}/g, issue.title || '')
         .replace(/{{issue_description}}/g, issue.description || 'No description provided')
         .replace(/{{issue_url}}/g, issue.url || '')
+
+    if (attachmentManifest) {
+      console.log(`[EdgeWorker] Adding attachment manifest to label-based prompt, length: ${attachmentManifest.length} characters`)
+      prompt = prompt + '\n\n' + attachmentManifest
+    }
 
       console.log(`[EdgeWorker] Label-based prompt built successfully, length: ${prompt.length} characters`)
       return prompt
