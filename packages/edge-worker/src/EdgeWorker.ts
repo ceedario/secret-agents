@@ -464,9 +464,12 @@ export class EdgeWorker extends EventEmitter {
     // Build and start Claude with initial prompt using full issue (streaming mode)
     console.log(`[EdgeWorker] Building initial prompt for issue ${fullIssue.identifier}`)
     try {
-      // Use buildPromptV2 with labels and system prompt info for workflow determination
-      const prompt = await this.buildPromptV2(fullIssue, repository, undefined, attachmentResult.manifest, labels, !!systemPrompt)
-      console.log(`[EdgeWorker] Initial prompt built successfully, length: ${prompt.length} characters`)
+      // Choose the appropriate prompt builder based on system prompt availability
+      const prompt = systemPrompt
+        ? await this.buildLabelBasedPrompt(fullIssue, repository)
+        : await this.buildPromptV2(fullIssue, repository, undefined, attachmentResult.manifest)
+      
+      console.log(`[EdgeWorker] Initial prompt built successfully using ${systemPrompt ? 'label-based' : 'fallback'} workflow, length: ${prompt.length} characters`)
       console.log(`[EdgeWorker] Starting Claude streaming session`)
       const sessionInfo = await runner.startStreaming(prompt)
       console.log(`[EdgeWorker] Claude streaming session started: ${sessionInfo.sessionId}`)
@@ -704,6 +707,47 @@ export class EdgeWorker extends EventEmitter {
   }
 
   /**
+   * Build simplified prompt for label-based workflows
+   * @param issue Full Linear issue
+   * @param repository Repository configuration
+   * @returns Formatted prompt string
+   */
+  private async buildLabelBasedPrompt(
+    issue: LinearIssue,
+    repository: RepositoryConfig
+  ): Promise<string> {
+    console.log(`[EdgeWorker] buildLabelBasedPrompt called for issue ${issue.identifier}`)
+
+    try {
+      // Load the label-based prompt template
+      const __filename = fileURLToPath(import.meta.url)
+      const __dirname = dirname(__filename)
+      const templatePath = resolve(__dirname, '../label-prompt-template.md')
+      
+      console.log(`[EdgeWorker] Loading label prompt template from: ${templatePath}`)
+      const template = await readFile(templatePath, 'utf-8')
+      console.log(`[EdgeWorker] Template loaded, length: ${template.length} characters`)
+
+      // Build the simplified prompt with only essential variables
+      const prompt = template
+        .replace(/{{repository_name}}/g, repository.name)
+        .replace(/{{base_branch}}/g, repository.baseBranch)
+        .replace(/{{issue_id}}/g, issue.id || '')
+        .replace(/{{issue_identifier}}/g, issue.identifier || '')
+        .replace(/{{issue_title}}/g, issue.title || '')
+        .replace(/{{issue_description}}/g, issue.description || 'No description provided')
+        .replace(/{{issue_url}}/g, issue.url || '')
+
+      console.log(`[EdgeWorker] Label-based prompt built successfully, length: ${prompt.length} characters`)
+      return prompt
+
+    } catch (error) {
+      console.error(`[EdgeWorker] Error building label-based prompt:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Convert full Linear SDK issue to CoreIssue interface for Session creation
    */
   private convertLinearIssueToCore(issue: LinearIssue): IssueMinimal {
@@ -814,17 +858,13 @@ ${reply.body}
    * @param repository Repository configuration  
    * @param newComment Optional new comment to focus on (for handleNewRootComment)
    * @param attachmentManifest Optional attachment manifest
-   * @param labels Issue labels for workflow determination
-   * @param hasSystemPrompt Whether a system prompt was applied based on labels
    * @returns Formatted prompt string
    */
   private async buildPromptV2(
     issue: LinearIssue,
     repository: RepositoryConfig,
     newComment?: LinearWebhookComment,
-    attachmentManifest: string = '',
-    labels: string[] = [],
-    hasSystemPrompt: boolean = false
+    attachmentManifest: string = ''
   ): Promise<string> {
     console.log(`[EdgeWorker] buildPromptV2 called for issue ${issue.identifier}${newComment ? ' with new comment' : ''}`)
 
@@ -848,12 +888,11 @@ ${reply.body}
       const state = await issue.state
       const stateName = state?.name || 'Unknown'
 
-      // Get formatted comment threads (only for fallback workflow)
+      // Get formatted comment threads
       const linearClient = this.linearClients.get(repository.id)
       let commentThreads = 'No comments yet.'
 
-      // For label-based workflows, skip comment fetching to simplify the message
-      if (!hasSystemPrompt && linearClient && issue.id) {
+      if (linearClient && issue.id) {
         try {
           console.log(`[EdgeWorker] Fetching comments for issue ${issue.identifier}`)
           const comments = await linearClient.comments({
@@ -868,10 +907,6 @@ ${reply.body}
         } catch (error) {
           console.error('Failed to fetch comments:', error)
         }
-      } else if (hasSystemPrompt) {
-        // For label-based workflows, indicate that comments are excluded
-        commentThreads = '(Comments excluded for focused issue processing)'
-        console.log(`[EdgeWorker] Using label-based workflow, skipping comment threads`)
       }
 
       // Build the prompt with all variables
@@ -884,7 +919,6 @@ ${reply.body}
         .replace(/{{issue_state}}/g, stateName)
         .replace(/{{issue_priority}}/g, issue.priority?.toString() || 'None')
         .replace(/{{issue_url}}/g, issue.url || '')
-        .replace(/{{issue_labels}}/g, labels.join(', ') || 'None')
         .replace(/{{comment_threads}}/g, commentThreads)
         .replace(/{{working_directory}}/g, this.config.handlers?.createWorkspace ?
           'Will be created based on issue' : repository.repositoryPath)
