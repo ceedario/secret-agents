@@ -76,9 +76,9 @@ export class AgentSessionManager {
   }
 
   /**
-   * Add a session entry from Claude user/assistant message
+   * Create a session entry from Claude user/assistant message (without syncing to Linear)
    */
-  async addSessionEntry(linearAgentActivitySessionId: string, sdkMessage: SDKUserMessage | SDKAssistantMessage): Promise<CyrusAgentSessionEntry> {
+  private async createSessionEntry(linearAgentActivitySessionId: string, sdkMessage: SDKUserMessage | SDKAssistantMessage): Promise<CyrusAgentSessionEntry> {
     // Extract tool info if this is an assistant message
     const toolInfo = sdkMessage.type === 'assistant' ? this.extractToolInfo(sdkMessage) : null
 
@@ -97,15 +97,47 @@ export class AgentSessionManager {
       }
     }
 
-    // Store locally
-    const entries = this.entries.get(linearAgentActivitySessionId) || []
-    entries.push(sessionEntry)
-    this.entries.set(linearAgentActivitySessionId, entries)
-
-    // Create AgentActivity in Linear
-    await this.syncEntryToLinear(sessionEntry, linearAgentActivitySessionId)
-
+    // DON'T store locally yet - wait until we actually post to Linear
     return sessionEntry
+  }
+
+
+  /**
+   * Format TodoWrite tool parameter as a nice checklist
+   */
+  private formatTodoWriteParameter(jsonContent: string): string {
+    try {
+      const data = JSON.parse(jsonContent)
+      if (!data.todos || !Array.isArray(data.todos)) {
+        return jsonContent
+      }
+
+      const todos = data.todos as Array<{id: string, content: string, status: string, priority: string}>
+      
+      // Keep original order but add status indicators
+      let formatted = '\n'
+      
+      todos.forEach((todo, index) => {
+        let statusEmoji = ''
+        if (todo.status === 'completed') {
+          statusEmoji = '✅ '
+        } else if (todo.status === 'in_progress') {
+          statusEmoji = '🔄 '
+        } else if (todo.status === 'pending') {
+          statusEmoji = '⏳ '
+        }
+        
+        formatted += `${statusEmoji}${todo.content}`
+        if (index < todos.length - 1) {
+          formatted += '\n'
+        }
+      })
+      
+      return formatted
+    } catch (error) {
+      console.error('[AgentSessionManager] Failed to format TodoWrite parameter:', error)
+      return jsonContent
+    }
   }
 
   /**
@@ -147,8 +179,13 @@ export class AgentSessionManager {
           break
 
         case 'user':
+          const userEntry = await this.createSessionEntry(linearAgentActivitySessionId, message as SDKUserMessage)
+          await this.syncEntryToLinear(userEntry, linearAgentActivitySessionId)
+          break
+          
         case 'assistant':
-          await this.addSessionEntry(linearAgentActivitySessionId, message as SDKUserMessage | SDKAssistantMessage)
+          const assistantEntry = await this.createSessionEntry(linearAgentActivitySessionId, message as SDKAssistantMessage)
+          await this.syncEntryToLinear(assistantEntry, linearAgentActivitySessionId)
           break
 
         case 'result':
@@ -201,11 +238,7 @@ export class AgentSessionManager {
       },
     }
 
-    // Store locally
-    const entries = this.entries.get(linearAgentActivitySessionId) || []
-    entries.push(resultEntry)
-    this.entries.set(linearAgentActivitySessionId, entries)
-
+    // DON'T store locally - syncEntryToLinear will do it
     // Sync to Linear
     await this.syncEntryToLinear(resultEntry, linearAgentActivitySessionId)
   }
@@ -272,6 +305,11 @@ export class AgentSessionManager {
         return
       }
 
+      // Store entry locally now that we're posting it
+      const entries = this.entries.get(linearAgentActivitySessionId) || []
+      entries.push(entry)
+      this.entries.set(linearAgentActivitySessionId, entries)
+
       // Build activity content based on entry type
       let content: any
       switch (entry.type) {
@@ -285,11 +323,19 @@ export class AgentSessionManager {
           if (entry.metadata?.toolUseId) {
             // Tool use - create an action activity
             const toolName = entry.metadata.toolName || 'Tool'
+            
+            // Special formatting for TodoWrite tool
+            let parameter = entry.content
+            let displayName = toolName
+            if (toolName === 'TodoWrite') {
+              parameter = this.formatTodoWriteParameter(entry.content)
+              displayName = 'Update Todos'
+            }
 
             content = {
               type: 'action',
-              action: toolName,
-              parameter: entry.content, // This is now just the JSON input
+              action: displayName,
+              parameter: parameter,
               // result will be added later when we get tool result
             }
           } else {
