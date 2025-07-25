@@ -10,5 +10,5 @@ export type { OAuthCallbackHandler } from './SharedApplicationServer.js'
 
 // Re-export useful types from dependencies
 export type { SDKMessage } from 'cyrus-claude-runner'
-export type { Issue, Workspace, Session } from 'cyrus-core'
+export type { Workspace } from 'cyrus-core'
 export { getAllTools, readOnlyTools } from 'cyrus-claude-runner'
