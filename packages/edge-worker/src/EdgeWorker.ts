@@ -441,7 +441,7 @@ export class EdgeWorker extends EventEmitter {
       workspaceName: fullIssue.identifier,
       mcpConfigPath: repository.mcpConfigPath,
       mcpConfig: this.buildMcpConfig(repository),
-      onMessage: (message) => this.handleClaudeMessage(message, repository.id),
+      onMessage: (message) => this.handleClaudeMessage(linearAgentActivitySessionId, message, repository.id),
       // onComplete: (messages) => this.handleClaudeComplete(initialComment.id, messages, repository.id),
       onError: (error) => this.handleClaudeError(error)
     })
@@ -543,7 +543,7 @@ export class EdgeWorker extends EventEmitter {
         mcpConfigPath: repository.mcpConfigPath,
         mcpConfig: this.buildMcpConfig(repository),
         onMessage: (message) => {
-          this.handleClaudeMessage(message, repository.id)
+          this.handleClaudeMessage(linearAgentActivitySessionId, message, repository.id)
         },
         // onComplete: (messages) => this.handleClaudeComplete(threadRootCommentId, messages, repository.id),
         onError: (error) => this.handleClaudeError(error)
@@ -614,13 +614,11 @@ export class EdgeWorker extends EventEmitter {
   /**
    * Handle Claude messages
    */
-  private async handleClaudeMessage(message: SDKMessage, repositoryId: string): Promise<void> {
-    // Get session ID from message if available
-    const sessionId = 'session_id' in message ? message.session_id : undefined
+  private async handleClaudeMessage(linearAgentActivitySessionId: string, message: SDKMessage, repositoryId: string): Promise<void> {
     const agentSessionManager = this.agentSessionManagers.get(repositoryId)
     // Integrate with AgentSessionManager to capture streaming messages
-    if (sessionId && agentSessionManager) {
-      await agentSessionManager.handleClaudeMessage(sessionId, message)
+    if (agentSessionManager) {
+      await agentSessionManager.handleClaudeMessage(linearAgentActivitySessionId, message)
     }
   }
 
@@ -805,7 +803,7 @@ ${reply.body}
             filter: { issue: { id: { eq: issue.id } } }
           })
 
-          const commentNodes = await comments.nodes
+          const commentNodes = comments.nodes
           if (commentNodes.length > 0) {
             commentThreads = await this.formatCommentThreads(commentNodes)
             console.log(`[EdgeWorker] Formatted ${commentNodes.length} comments into threads`)
@@ -1111,7 +1109,7 @@ ${newComment ? `New comment to address:\n${newComment.body}\n\n` : ''}Please ana
           const comments = await linearClient.comments({
             filter: { issue: { id: { eq: issue.id } } }
           })
-          const commentNodes = await comments.nodes
+          const commentNodes = comments.nodes
           for (const comment of commentNodes) {
             const urls = this.extractAttachmentUrls(comment.body)
             commentUrls.push(...urls)
