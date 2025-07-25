@@ -25,6 +25,7 @@ vi.mock('os', () => ({
 }))
 
 import { query, AbortError } from '@anthropic-ai/claude-code'
+import { createWriteStream } from 'fs'
 import { ClaudeRunner } from '../src/ClaudeRunner'
 import type { ClaudeRunnerConfig, SDKMessage } from '../src/types'
 
@@ -609,6 +610,115 @@ describe('ClaudeRunner', () => {
       
       expect(messages1).toEqual(messages2)
       expect(messages1).not.toBe(messages2) // Different array instances
+    })
+  })
+
+  describe('logging', () => {
+    it('should create log file with "pending" in filename before session ID is assigned', async () => {
+      const mockMessages: SDKMessage[] = [
+        {
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Hello!' }] },
+          parent_tool_use_id: null,
+          session_id: 'actual-session-id-123'
+        } as any
+      ]
+      
+      mockQuery.mockImplementation(async function* () {
+        for (const message of mockMessages) {
+          yield message
+        }
+      })
+
+      // Mock the file system operations to track log file creation
+      const mockCreateWriteStream = vi.mocked(createWriteStream)
+      const writtenFilePaths: string[] = []
+      
+      mockCreateWriteStream.mockImplementation((path: string) => {
+        writtenFilePaths.push(path)
+        return {
+          write: vi.fn(),
+          end: vi.fn(),
+          on: vi.fn()
+        } as any
+      })
+      
+      const runner = new ClaudeRunner({
+        workingDirectory: '/tmp/test',
+        workspaceName: 'test-workspace'
+      })
+      
+      await runner.start('test prompt')
+      
+      // Verify that a log file was created with 'pending' in the filename
+      expect(writtenFilePaths.length).toBeGreaterThan(0)
+      const firstLogPath = writtenFilePaths[0]
+      
+      // The log file should contain 'pending' because setupLogging() is called
+      // before the session ID is received from Claude
+      expect(firstLogPath).toContain('session-pending-')
+      expect(firstLogPath).toContain('/mock/home/.cyrus/logs/test-workspace/')
+      expect(firstLogPath).toContain('.jsonl')
+      
+      // Even though Claude returned 'actual-session-id-123', the log file
+      // still has 'pending' in its name
+      expect(firstLogPath).not.toContain('actual-session-id-123')
+    })
+
+    it('should re-create log file with actual session ID after it is assigned', async () => {
+      const mockMessages: SDKMessage[] = [
+        {
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Hello!' }] },
+          parent_tool_use_id: null,
+          session_id: 'actual-session-id-456'
+        } as any
+      ]
+      
+      mockQuery.mockImplementation(async function* () {
+        for (const message of mockMessages) {
+          yield message
+        }
+      })
+
+      // Mock the file system operations to track log file creation
+      const mockCreateWriteStream = vi.mocked(createWriteStream)
+      const writtenFilePaths: string[] = []
+      
+      mockCreateWriteStream.mockImplementation((path: string) => {
+        writtenFilePaths.push(path)
+        return {
+          write: vi.fn(),
+          end: vi.fn(),
+          on: vi.fn()
+        } as any
+      })
+      
+      const runner = new ClaudeRunner({
+        workingDirectory: '/tmp/test',
+        workspaceName: 'test-workspace'
+      })
+      
+      await runner.start('test prompt')
+      
+      // Currently, setupLogging() is called twice:
+      // 1. Initially without session ID (creates file with 'pending')
+      // 2. After receiving session ID from Claude
+      expect(writtenFilePaths.length).toBe(2)
+      
+      const firstLogPath = writtenFilePaths[0]
+      const secondLogPath = writtenFilePaths[1]
+      
+      // First log file should have 'pending'
+      expect(firstLogPath).toContain('session-pending-')
+      
+      // Second log file should have the actual session ID
+      expect(secondLogPath).toContain('session-actual-session-id-456-')
+      expect(secondLogPath).not.toContain('pending')
+      
+      // This demonstrates the issue: we create two log files for one session
+      // The user sees "Creating log file at: ... session-pending-..."
+      // But the actual logs go to a different file with the real session ID
     })
   })
 })
