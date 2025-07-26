@@ -395,10 +395,6 @@ export class EdgeWorker extends EventEmitter {
       return
     }
 
-    // Post initial comment immediately
-    // TODO! replace this with agent activity, or comment out
-    // const initialComment = await this.postInitialComment(issue.id, repository.id)
-
     // Post instant acknowledgment thought
     await this.postInstantAcknowledgment(linearAgentActivitySessionId, repository.id)
 
