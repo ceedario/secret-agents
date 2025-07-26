@@ -78,7 +78,7 @@ export class AgentSessionManager {
   /**
    * Create a session entry from Claude user/assistant message (without syncing to Linear)
    */
-  private async createSessionEntry(linearAgentActivitySessionId: string, sdkMessage: SDKUserMessage | SDKAssistantMessage): Promise<CyrusAgentSessionEntry> {
+  private async createSessionEntry(_linearAgentActivitySessionId: string, sdkMessage: SDKUserMessage | SDKAssistantMessage): Promise<CyrusAgentSessionEntry> {
     // Extract tool info if this is an assistant message
     const toolInfo = sdkMessage.type === 'assistant' ? this.extractToolInfo(sdkMessage) : null
 
@@ -321,22 +321,26 @@ export class AgentSessionManager {
         case 'assistant':
           // Assistant messages can be thoughts or responses
           if (entry.metadata?.toolUseId) {
-            // Tool use - create an action activity
             const toolName = entry.metadata.toolName || 'Tool'
             
-            // Special formatting for TodoWrite tool
-            let parameter = entry.content
-            let displayName = toolName
+            // Special handling for TodoWrite tool - treat as thought instead of action
             if (toolName === 'TodoWrite') {
-              parameter = this.formatTodoWriteParameter(entry.content)
-              displayName = 'Update Todos'
-            }
+              const formattedTodos = this.formatTodoWriteParameter(entry.content)
+              content = {
+                type: 'thought',
+                body: `Update Todos${formattedTodos}`
+              }
+            } else {
+              // Other tools remain as actions
+              let parameter = entry.content
+              let displayName = toolName
 
-            content = {
-              type: 'action',
-              action: displayName,
-              parameter: parameter,
-              // result will be added later when we get tool result
+              content = {
+                type: 'action',
+                action: displayName,
+                parameter: parameter,
+                // result will be added later when we get tool result
+              }
             }
           } else {
             // Regular assistant message - create a thought
