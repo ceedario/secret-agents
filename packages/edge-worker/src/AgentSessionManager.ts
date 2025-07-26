@@ -328,7 +328,7 @@ export class AgentSessionManager {
               const formattedTodos = this.formatTodoWriteParameter(entry.content)
               content = {
                 type: 'thought',
-                body: `Update Todos${formattedTodos}`
+                body: formattedTodos
               }
             } else {
               // Other tools remain as actions
