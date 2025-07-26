@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Instant acknowledgment responses when Cyrus receives a request, providing immediate feedback to users
-- System prompt selection notifications that inform users which mode Cyrus is using based on issue labels (debugger, builder, or scoper)
+- Role mode notifications when issue labels trigger specific workflows (e.g., "Entering 'debugger' mode because of the 'Bug' label")
 
 ### Changed
 - TodoWrite tool messages are now displayed as "thoughts" instead of "actions" in Linear for better visual organization

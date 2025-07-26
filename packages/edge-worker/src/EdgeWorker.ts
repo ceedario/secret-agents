@@ -1639,32 +1639,44 @@ ${newComment ? `New comment to address:\n${newComment.body}\n\n` : ''}Please ana
         return
       }
 
-      // Determine which prompt type was selected
-      let selectedPromptType = 'standard'
+      // Determine which prompt type was selected and which label triggered it
+      let selectedPromptType: string | null = null
+      let triggerLabel: string | null = null
       const repository = Array.from(this.repositories.values()).find(r => r.id === repositoryId)
       
       if (repository?.labelPrompts) {
-        if (repository.labelPrompts.debugger?.some(label => labels.includes(label))) {
+        // Check debugger labels
+        const debuggerLabel = repository.labelPrompts.debugger?.find(label => labels.includes(label))
+        if (debuggerLabel) {
           selectedPromptType = 'debugger'
-        } else if (repository.labelPrompts.builder?.some(label => labels.includes(label))) {
-          selectedPromptType = 'builder'
-        } else if (repository.labelPrompts.scoper?.some(label => labels.includes(label))) {
-          selectedPromptType = 'scoper'
+          triggerLabel = debuggerLabel
+        } else {
+          // Check builder labels
+          const builderLabel = repository.labelPrompts.builder?.find(label => labels.includes(label))
+          if (builderLabel) {
+            selectedPromptType = 'builder'
+            triggerLabel = builderLabel
+          } else {
+            // Check scoper labels
+            const scoperLabel = repository.labelPrompts.scoper?.find(label => labels.includes(label))
+            if (scoperLabel) {
+              selectedPromptType = 'scoper'
+              triggerLabel = scoperLabel
+            }
+          }
         }
       }
 
-      const promptMessages = {
-        debugger: 'I\'ve detected the "Bug" label. I\'ll use a systematic debugging approach to help identify and resolve the issue.',
-        builder: 'I\'ve detected a feature-related label. I\'ll focus on implementing this feature with clean, maintainable code.',
-        scoper: 'I\'ve detected the "PRD" label. I\'ll help analyze and scope the requirements for this feature.',
-        standard: 'I\'ll analyze this issue and provide the appropriate solution.'
+      // Only post if a role was actually triggered
+      if (!selectedPromptType || !triggerLabel) {
+        return
       }
 
       const activityInput = {
         agentSessionId: linearAgentActivitySessionId,
         content: {
           type: 'thought',
-          body: promptMessages[selectedPromptType as keyof typeof promptMessages]
+          body: `Entering '${selectedPromptType}' mode because of the '${triggerLabel}' label. I'll follow the ${selectedPromptType} process...`
         }
       }
 
