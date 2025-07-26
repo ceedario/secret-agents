@@ -395,9 +395,8 @@ export class EdgeWorker extends EventEmitter {
       return
     }
 
-    // Post initial comment immediately
-    // TODO! replace this with agent activity, or comment out
-    // const initialComment = await this.postInitialComment(issue.id, repository.id)
+    // Post instant acknowledgment thought
+    await this.postInstantAcknowledgment(linearAgentActivitySessionId, repository.id)
 
     // Fetch full Linear issue details immediately
     const fullIssue = await this.fetchFullIssueDetails(issue.id, repository.id)
@@ -436,6 +435,11 @@ export class EdgeWorker extends EventEmitter {
     // Fetch issue labels and determine system prompt
     const labels = await this.fetchIssueLabels(fullIssue)
     const systemPrompt = await this.determineSystemPromptFromLabels(labels, repository)
+
+    // Post thought about system prompt selection
+    if (systemPrompt) {
+      await this.postSystemPromptSelectionThought(linearAgentActivitySessionId, labels, repository.id)
+    }
 
     // Create Claude runner with attachment directory access and optional system prompt
     const runner = new ClaudeRunner({
@@ -1587,6 +1591,99 @@ ${newComment ? `New comment to address:\n${newComment.body}\n\n` : ''}Please ana
           console.log(`[EdgeWorker] Restored Agent Session state for repository ${repositoryId}`)
         }
       }
+    }
+  }
+
+  /**
+   * Post instant acknowledgment thought when agent session is created
+   */
+  private async postInstantAcknowledgment(linearAgentActivitySessionId: string, repositoryId: string): Promise<void> {
+    try {
+      const linearClient = this.linearClients.get(repositoryId)
+      if (!linearClient) {
+        console.warn(`[EdgeWorker] No Linear client found for repository ${repositoryId}`)
+        return
+      }
+
+      const activityInput = {
+        agentSessionId: linearAgentActivitySessionId,
+        content: {
+          type: 'thought',
+          body: 'I\'ve received your request and I\'m starting to work on it. Let me analyze the issue and prepare my approach.'
+        }
+      }
+
+      const result = await linearClient.createAgentActivity(activityInput)
+      if (result.success) {
+        console.log(`[EdgeWorker] Posted instant acknowledgment thought for session ${linearAgentActivitySessionId}`)
+      } else {
+        console.error(`[EdgeWorker] Failed to post instant acknowledgment:`, result)
+      }
+    } catch (error) {
+      console.error(`[EdgeWorker] Error posting instant acknowledgment:`, error)
+    }
+  }
+
+  /**
+   * Post thought about system prompt selection based on labels
+   */
+  private async postSystemPromptSelectionThought(linearAgentActivitySessionId: string, labels: string[], repositoryId: string): Promise<void> {
+    try {
+      const linearClient = this.linearClients.get(repositoryId)
+      if (!linearClient) {
+        console.warn(`[EdgeWorker] No Linear client found for repository ${repositoryId}`)
+        return
+      }
+
+      // Determine which prompt type was selected and which label triggered it
+      let selectedPromptType: string | null = null
+      let triggerLabel: string | null = null
+      const repository = Array.from(this.repositories.values()).find(r => r.id === repositoryId)
+      
+      if (repository?.labelPrompts) {
+        // Check debugger labels
+        const debuggerLabel = repository.labelPrompts.debugger?.find(label => labels.includes(label))
+        if (debuggerLabel) {
+          selectedPromptType = 'debugger'
+          triggerLabel = debuggerLabel
+        } else {
+          // Check builder labels
+          const builderLabel = repository.labelPrompts.builder?.find(label => labels.includes(label))
+          if (builderLabel) {
+            selectedPromptType = 'builder'
+            triggerLabel = builderLabel
+          } else {
+            // Check scoper labels
+            const scoperLabel = repository.labelPrompts.scoper?.find(label => labels.includes(label))
+            if (scoperLabel) {
+              selectedPromptType = 'scoper'
+              triggerLabel = scoperLabel
+            }
+          }
+        }
+      }
+
+      // Only post if a role was actually triggered
+      if (!selectedPromptType || !triggerLabel) {
+        return
+      }
+
+      const activityInput = {
+        agentSessionId: linearAgentActivitySessionId,
+        content: {
+          type: 'thought',
+          body: `Entering '${selectedPromptType}' mode because of the '${triggerLabel}' label. I'll follow the ${selectedPromptType} process...`
+        }
+      }
+
+      const result = await linearClient.createAgentActivity(activityInput)
+      if (result.success) {
+        console.log(`[EdgeWorker] Posted system prompt selection thought for session ${linearAgentActivitySessionId} (${selectedPromptType} mode)`)
+      } else {
+        console.error(`[EdgeWorker] Failed to post system prompt selection thought:`, result)
+      }
+    } catch (error) {
+      console.error(`[EdgeWorker] Error posting system prompt selection thought:`, error)
     }
   }
 }
