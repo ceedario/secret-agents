@@ -4,11 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.1.33-alpha.0] - 2025-01-26
+## [0.1.35-alpha.0] - 2025-01-26
 
 ### Added
 - Instant acknowledgment responses when Cyrus receives a request, providing immediate feedback to users
 - Role mode notifications when issue labels trigger specific workflows (e.g., "Entering 'debugger' mode because of the 'Bug' label")
+- You can now append custom instructions to Claude's system prompt via `appendInstruction` in repository config (~/.cyrus/config.json) - because sometimes Claude needs a gentle reminder that your variable names are art, not accidents
 
 ### Changed
 - TodoWrite tool messages are now displayed as "thoughts" instead of "actions" in Linear for better visual organization
@@ -32,7 +33,7 @@ All notable changes to this project will be documented in this file.
 - cyrus-ndjson-client@0.0.13-alpha.0
 
 #### cyrus-ai (CLI)
-- cyrus-ai@0.1.33-alpha.0
+- cyrus-ai@0.1.35-alpha.0
 
 ## [0.1.32] - 2025-01-09
 
